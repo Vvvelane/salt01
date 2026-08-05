@@ -1,0 +1,16 @@
+.venv/
+.env
+data/**
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+量化/Alpha01/data/
+recipe/var/
+outputs/
+research_outputs/
+

@@ -1,0 +1,3 @@
+- [ ] memory enhancement
+- [ ] jane street question
+- [ ] statistics related

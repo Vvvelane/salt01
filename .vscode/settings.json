@@ -1,0 +1,30 @@
+{
+    "python.defaultInterpreterPath": "/opt/homebrew/bin/python3.12",
+    "files.exclude": {
+        "**/.venv": true,
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/量化/Alpha01/data": true,
+        "**/recipe/var": true,
+        "**/outputs": true,
+        "**/research_outputs": true
+    },
+    "search.exclude": {
+        "**/.venv": true,
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/量化/Alpha01/data": true,
+        "**/recipe/var": true,
+        "**/outputs": true,
+        "**/research_outputs": true
+    },
+    "files.watcherExclude": {
+        "**/.venv/**": true,
+        "**/__pycache__/**": true,
+        "**/.pytest_cache/**": true,
+        "**/量化/Alpha01/data/**": true,
+        "**/recipe/var/**": true,
+        "**/outputs/**": true,
+        "**/research_outputs/**": true
+    }
+}

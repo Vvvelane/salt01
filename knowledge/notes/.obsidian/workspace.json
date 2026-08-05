@@ -1,0 +1,215 @@
+{
+  "main": {
+    "id": "29c64431913f18e8",
+    "type": "split",
+    "children": [
+      {
+        "id": "50b5156663c05f76",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7d361f6cf11f7586",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "核心工程/随笔：Reading Practical Statistics for Data - Science.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "随笔：Reading Practical Statistics for Data - Science"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "cc1a0ceaa07a7dce",
+    "type": "split",
+    "children": [
+      {
+        "id": "8607972fc619c85f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "cb4f50192c0abfdd",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "3c5df994aad11489",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "4d85e586b0ddeb3c",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 267.6718559265137
+  },
+  "right": {
+    "id": "afc818fe390f741c",
+    "type": "split",
+    "children": [
+      {
+        "id": "1e94b12de946f1a6",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "82bf34145433f44f",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "小知识/2026.7.31.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "2026.7.31 的反向链接列表"
+            }
+          },
+          {
+            "id": "69ab201ae66a9222",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "小知识/2026.7.31.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "2026.7.31 的出链列表"
+            }
+          },
+          {
+            "id": "73e647daa8d7574d",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "e2f0bc304b221867",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "65e7b199645459c1",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "小知识/2026.7.31.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "2026.7.31 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "7d361f6cf11f7586",
+  "lastOpenFiles": [
+    "核心工程/Q&A for EDA in time-series data.md",
+    "核心工程/随笔：Reading Practical Statistics for Data - Science.md",
+    "核心工程/数据种类.canvas",
+    "核心工程/核心工程.md",
+    "核心工程/实战派数据分析.canvas",
+    "Pasted image 20260802132733.png",
+    "fd69edd7d4e945c0fc6480ea3825cb59.jpg",
+    "Pasted image 20260802202307.png",
+    "小知识/小知识.md",
+    "小知识/新加坡生活to-do.md",
+    "小知识/things to do today.md",
+    "小知识/things to do",
+    "未命名 4.canvas",
+    "未命名 3.canvas",
+    "2026-08-02.md",
+    "未命名.base",
+    "未命名 2.canvas",
+    "未命名.md",
+    "核心工程",
+    "复线内容/可视化.md",
+    "复线内容/alpha001 prompt.md",
+    "小知识/2026.7.31.md",
+    "小知识/2026.7.29.md",
+    "Pasted image 20260729222948.png"
+  ]
+}

@@ -1,0 +1,8 @@
+import { api } from '../api.js';
+import { showMessage, statusBadge } from '../components/status.js';
+
+export async function renderResearch(root) {
+  root.innerHTML = `<div class="view-head"><div><p class="eyebrow">RESEARCH AUDIT</p><h2>研究审计</h2><p class="muted">只展示已注册、可验证的外部研究输出；Recipe 不计算因子或回测。</p></div><div id="research-state"></div></div><section class="panel" id="research-empty"><div class="empty-state"><h3>No research outputs configured.</h3><p>Recipe has market data, but no factor/backtest run is registered.</p><p>Add a valid research manifest and refresh the research catalog.</p>${statusBadge('no-data','no_data')}</div></section><section class="panel"><h3>Contract 状态</h3><div class="grid contract-grid"><div><span class="muted">manifest schema</span><strong>recipe-research-v1</strong></div><div><span class="muted">source 配置</span><strong>backend configured source</strong></div><div><span class="muted">contract 文档</span><a href="/static/research-contract.md">research contract</a></div></div></section><section class="panel" id="research-modules"><h3>Artifacts</h3><p class="muted">无 run 时不初始化 PnL、shortlist、trade 或任何示例曲线。</p></section>`;
+  try { const response = await api.researchStatus ? await api.researchStatus() : await fetch('/api/v1/research/status').then(result => result.json()); if (response.status === 'no_data') { document.querySelector('#research-state').innerHTML = statusBadge('no-data','no_data'); return; } document.querySelector('#research-empty').innerHTML = `<h3>Registered runs</h3><p>选择一个经过 manifest 验证的 run 后才按 artifact availability 加载模块。</p>`; } catch (error) { document.querySelector('#research-state').innerHTML = showMessage(error.message, 'error'); }
+}
+

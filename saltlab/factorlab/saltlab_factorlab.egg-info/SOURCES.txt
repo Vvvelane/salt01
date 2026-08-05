@@ -1,0 +1,16 @@
+pyproject.toml
+./__init__.py
+./backtest.py
+./cli.py
+./config.py
+./data.py
+./factors.py
+./registry.py
+./research.py
+./runner.py
+saltlab_factorlab.egg-info/PKG-INFO
+saltlab_factorlab.egg-info/SOURCES.txt
+saltlab_factorlab.egg-info/dependency_links.txt
+saltlab_factorlab.egg-info/requires.txt
+saltlab_factorlab.egg-info/top_level.txt
+tests/test_factorlab.py
