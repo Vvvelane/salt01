@@ -2,10 +2,13 @@ Metadata-Version: 2.4
 Name: recipe
 Version: 0.1.0
 Summary: Read-only quantitative research data browser
-Requires-Python: >=3.9
+Requires-Python: <3.13,>=3.12
 Requires-Dist: fastapi==0.115.6
 Requires-Dist: uvicorn==0.34.0
+Requires-Dist: duckdb<2,>=1.5
+Requires-Dist: pyarrow<26,>=25
 Requires-Dist: polars==1.17.1
+Requires-Dist: pydantic<3,>=2.13
 Requires-Dist: typing-extensions==4.14.1
 Provides-Extra: test
 Requires-Dist: pytest==8.3.4; extra == "test"

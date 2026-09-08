@@ -4,16 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "saltlab-factorlab"
-version = "0.1.0"
-description = "Reproducible futures factor research and normalized historical simulation"
-requires-python = ">=3.9"
-dependencies = ["numpy>=1.24", "pandas>=2.0"]
+version = "0.2.0"
+description = "Auditable futures factor research over published salt-data"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "duckdb>=1.5,<2",
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "pyarrow>=25,<26",
+]
 
-[tool.setuptools]
-packages = ["saltlab.factorlab"]
-
-[tool.setuptools.package-dir]
-"saltlab.factorlab" = "."
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
+[tool.setuptools.packages.find]
+where = ["src"]

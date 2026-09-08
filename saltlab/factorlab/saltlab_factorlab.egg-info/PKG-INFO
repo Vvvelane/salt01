@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: saltlab-factorlab
-Version: 0.1.0
-Summary: Reproducible futures factor research and normalized historical simulation
-Requires-Python: >=3.9
-Requires-Dist: numpy>=1.24
-Requires-Dist: pandas>=2.0
