@@ -34,10 +34,12 @@ package = false
 default-groups = ["dev", "research", "notebook"]
 
 [tool.uv.workspace]
-members = ["SALTlab/Factorlab", "Recipe"]
+members = ["SaltCore", "SALTlab/Factorlab", "SALTlab/vollab", "Recipe"]
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
 testpaths = [
+  "SaltCore/tests",
+  "SALTlab/vollab/tests",
   "Recipe/tests",
 ]
