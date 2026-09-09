@@ -18,10 +18,10 @@ from .meta import contracts, parse_tick, products, sessions, tick_size
 from .types import COLUMNS, BarScan, BarSet, BarSlice
 
 __all__ = [
+    "COLUMNS",
     "BarScan",
     "BarSet",
     "BarSlice",
-    "COLUMNS",
     "Product",
     "SaltDataRootError",
     "all_products",

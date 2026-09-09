@@ -10,8 +10,11 @@ resolution-markers = [
 [manifest]
 members = [
     "recipe",
+    "salt-nacl-registry",
     "salt01-workspace",
+    "saltcore",
     "saltlab-factorlab",
+    "vollab",
 ]
 
 [[package]]
@@ -1535,7 +1538,7 @@ wheels = [
 [[package]]
 name = "recipe"
 version = "0.1.0"
-source = { editable = "recipe" }
+source = { editable = "Recipe" }
 dependencies = [
     { name = "duckdb" },
     { name = "fastapi" },
@@ -1677,9 +1680,25 @@ wheels = [
 ]
 
 [[package]]
+name = "salt-nacl-registry"
+version = "0.1.0"
+source = { editable = "NaCl" }
+dependencies = [
+    { name = "jsonschema" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "jsonschema", specifier = ">=4.26,<5" }]
+
+[[package]]
 name = "salt01-workspace"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "salt-nacl-registry" },
+    { name = "saltcore" },
+    { name = "saltlab-factorlab" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -1706,6 +1725,11 @@ research = [
 ]
 
 [package.metadata]
+requires-dist = [
+    { name = "salt-nacl-registry", editable = "NaCl" },
+    { name = "saltcore", editable = "SaltCore" },
+    { name = "saltlab-factorlab", editable = "SALTlab/Factorlab" },
+]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1732,22 +1756,33 @@ research = [
 ]
 
 [[package]]
-name = "saltlab-factorlab"
-version = "0.2.0"
-source = { editable = "saltlab/factorlab" }
+name = "saltcore"
+version = "0.1.0"
+source = { editable = "SaltCore" }
 dependencies = [
     { name = "duckdb" },
-    { name = "numpy" },
     { name = "pandas" },
-    { name = "pyarrow" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "duckdb", specifier = ">=1.5,<2" },
-    { name = "numpy", specifier = ">=1.24" },
-    { name = "pandas", specifier = ">=2.0" },
-    { name = "pyarrow", specifier = ">=25,<26" },
+    { name = "pandas", specifier = ">=2.2" },
+]
+
+[[package]]
+name = "saltlab-factorlab"
+version = "0.2.0"
+source = { editable = "SALTlab/Factorlab" }
+dependencies = [
+    { name = "salt-nacl-registry" },
+    { name = "saltcore" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "salt-nacl-registry", editable = "NaCl" },
+    { name = "saltcore", editable = "SaltCore" },
 ]
 
 [[package]]
@@ -2024,6 +2059,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ea/fa/18004e5cb15541ad2a68ff219c755233b012b12d4ec8663d06a258082bec/virtualenv-21.7.1.tar.gz", hash = "sha256:d0dbfaa5483487baea28d7210ef8d24c9d1bd0f10f449eeb215568825a9b334e", size = 5525237, upload-time = "2026-07-30T15:40:36.36Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4b/a7/ded126c19495158a05c7202b3389139839d4cf78d622d453867778e0f7a8/virtualenv-21.7.1-py3-none-any.whl", hash = "sha256:6394973f990536e34c05157179146c020284c42fe01da1dfeb0ba16c345280d9", size = 5504576, upload-time = "2026-07-30T15:40:34.512Z" },
+]
+
+[[package]]
+name = "vollab"
+version = "0.1.0"
+source = { editable = "SALTlab/vollab" }
+dependencies = [
+    { name = "duckdb" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "saltcore" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "duckdb", specifier = ">=1.5,<2" },
+    { name = "numpy", specifier = ">=1.26" },
+    { name = "pandas", specifier = ">=2.2" },
+    { name = "saltcore", editable = "SaltCore" },
 ]
 
 [[package]]

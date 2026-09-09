@@ -101,7 +101,9 @@ def find_product(token: str, root: str | None = None) -> Product:
     live = [p for p in hits if not p.retired]
     if len(live) == 1:
         return live[0]
-    raise KeyError(f"{token!r} 指向多个品种：{[p.product_id for p in hits]}，请改用 交易所.品种 形式")
+    raise KeyError(
+        f"{token!r} 指向多个品种：{[p.product_id for p in hits]}，请改用 交易所.品种 形式"
+    )
 
 
 def split_contract(token: str) -> tuple[str, int, int] | None:

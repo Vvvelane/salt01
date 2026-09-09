@@ -7,12 +7,7 @@ name = "saltlab-factorlab"
 version = "0.2.0"
 description = "Auditable futures factor research over published salt-data"
 requires-python = ">=3.12,<3.13"
-dependencies = [
-  "duckdb>=1.5,<2",
-  "numpy>=1.24",
-  "pandas>=2.0",
-  "pyarrow>=25,<26",
-]
+dependencies = ["saltcore", "salt-nacl-registry"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

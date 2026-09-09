@@ -8,11 +8,13 @@
 ## 跑
 
 ```bash
-export PYTHONPATH=SaltCore/src:SALTlab/vollab/src
-python SALTlab/vollab/scripts/run_ranking.py            # 打印
-python SALTlab/vollab/scripts/run_ranking.py --write    # 写回 salt-data 的文档
-python SALTlab/vollab/scripts/run_ranking.py --window 5 --csv raw.csv
+uv run --package vollab python SALTlab/vollab/scripts/run_ranking.py            # 打印
+uv run --package vollab python SALTlab/vollab/scripts/run_ranking.py --write    # 写回 salt-data 的文档
+uv run --package vollab python SALTlab/vollab/scripts/run_ranking.py --window 5 --csv raw.csv
 ```
+
+先在仓库根目录运行 `uv sync --all-packages`。`saltcore` 和 `vollab` 由
+workspace 作为 editable packages 安装；运行脚本不需要手动设置 `PYTHONPATH`。
 
 全候选池（96 个品种、三年窗口）跑完约 13 秒。
 

@@ -1,3 +1,5 @@
+# ruff: noqa: DTZ001
+# Source timestamps intentionally retain timezone-naive Beijing labels.
 """把用户给的目标和时间范围，规整成查询用的规格。"""
 
 from __future__ import annotations
@@ -5,8 +7,8 @@ from __future__ import annotations
 import calendar
 import datetime as dt
 import re
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Iterable, Sequence
 
 from ._index import Product, find_product, split_contract
 
@@ -32,6 +34,10 @@ def parse_time(value: TimeLike, *, side: str) -> dt.datetime | None:
     if value is None:
         return None
     if isinstance(value, dt.datetime):
+        if value.tzinfo is not None:
+            raise ValueError(
+                "源时间是不带时区的北京时间；请先转换为 Asia/Shanghai 并去掉 tzinfo"
+            )
         return value
     if isinstance(value, dt.date):
         return dt.datetime.combine(value, dt.time.max if side == "end" else dt.time.min)
@@ -41,17 +47,25 @@ def parse_time(value: TimeLike, *, side: str) -> dt.datetime | None:
 
     if _YEAR.match(text):
         y = int(text)
-        return dt.datetime(y, 12, 31, 23, 59, 59) if side == "end" else dt.datetime(y, 1, 1)
+        return (
+            dt.datetime(y, 12, 31, 23, 59, 59, 999999)
+            if side == "end"
+            else dt.datetime(y, 1, 1)
+        )
     if m := _YEAR_MONTH.match(text):
         y, mo = int(m.group(1)), int(m.group(2))
         if side == "end":
-            return dt.datetime(y, mo, calendar.monthrange(y, mo)[1], 23, 59, 59)
+            return dt.datetime(y, mo, calendar.monthrange(y, mo)[1], 23, 59, 59, 999999)
         return dt.datetime(y, mo, 1)
     if m := _DATE.match(text):
         y, mo, d = (int(g) for g in m.groups())
-        return dt.datetime(y, mo, d, 23, 59, 59) if side == "end" else dt.datetime(y, mo, d)
+        return (
+            dt.datetime(y, mo, d, 23, 59, 59, 999999)
+            if side == "end"
+            else dt.datetime(y, mo, d)
+        )
     try:
-        return dt.datetime.fromisoformat(text)
+        return parse_time(dt.datetime.fromisoformat(text), side=side)
     except ValueError:
         _fail(value)
         raise  # 不会走到，只是让类型检查满意
@@ -67,7 +81,9 @@ class Target:
     @property
     def key(self) -> str:
         """返回结果里用的键：点名合约时用合约，否则用品种。"""
-        return self.contracts[0] if len(self.contracts) == 1 else self.product.product_id
+        return (
+            self.contracts[0] if len(self.contracts) == 1 else self.product.product_id
+        )
 
 
 def parse_targets(
@@ -107,7 +123,14 @@ def parse_targets(
     extra = [c.strip().upper() for c in (contracts or [])]
     if extra:
         if len(order) != 1:
-            raise ValueError("contracts= 只能配合单个品种使用；多品种请直接把合约写进 target")
+            raise ValueError(
+                "contracts= 只能配合单个品种使用；多品种请直接把合约写进 target"
+            )
+        product = bucket[order[0]][0]
+        for code in extra:
+            parsed = split_contract(code)
+            if parsed is None or parsed[0] != product.code:
+                raise ValueError(f"合约 {code!r} 不属于 {product.product_id}")
         bucket[order[0]][1].extend(extra)
 
     out = []
@@ -117,14 +140,15 @@ def parse_targets(
     return out
 
 
-def contract_window(contract: str) -> tuple[dt.datetime, dt.datetime] | None:
-    """合约代码能给出的时间上下界，用来在读之前先筛掉文件。
+def contract_end(contract: str) -> dt.datetime | None:
+    """Contract month end is a conservative upper bound for file selection.
 
-    上界是交割月月末；下界保守取上界前 5 年（挂牌最早的品种也在这之内）。
+    Do not infer a listing start or assume a maximum five-year lifetime.
     """
     parsed = split_contract(contract)
     if parsed is None:
         return None
     _, year, month = parsed
-    last = dt.datetime(year, month, calendar.monthrange(year, month)[1], 23, 59, 59)
-    return last.replace(year=year - 5, month=1, day=1, hour=0, minute=0, second=0), last
+    return dt.datetime(
+        year, month, calendar.monthrange(year, month)[1], 23, 59, 59, 999999
+    )

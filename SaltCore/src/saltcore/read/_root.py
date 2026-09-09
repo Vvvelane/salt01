@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import os
-from functools import lru_cache
 from pathlib import Path
 
-DEFAULT_ROOT = Path("/Users/kangbohang/Developer/salt-data")
 DERIVED = "派生数据"
+DEFAULT_ROOT = next(
+    (
+        parent / "salt-data"
+        for parent in Path(__file__).resolve().parents
+        if (parent / "salt-data" / DERIVED).is_dir()
+    ),
+    Path.cwd().parent / "salt-data",
+)
 CATALOG = "元数据/catalog.duckdb"
 
 
@@ -15,7 +21,6 @@ class SaltDataRootError(RuntimeError):
     """数据根目录不存在或不是一个 salt-data 目录。"""
 
 
-@lru_cache(maxsize=8)
 def data_root(explicit: str | None = None) -> Path:
     """解析 salt-data 根目录。
 
@@ -24,7 +29,9 @@ def data_root(explicit: str | None = None) -> Path:
     raw = explicit or os.environ.get("SALT_DATA_ROOT") or str(DEFAULT_ROOT)
     root = Path(raw).expanduser().resolve()
     if not (root / DERIVED).is_dir():
-        raise SaltDataRootError(f"{root} 下没有 {DERIVED}/，不是有效的 salt-data 根目录")
+        raise SaltDataRootError(
+            f"{root} 下没有 {DERIVED}/，不是有效的 salt-data 根目录"
+        )
     return root
 
 

@@ -3,7 +3,7 @@ name = "salt01-workspace"
 version = "0.1.0"
 description = "NaCl contracts, research packages, and the Recipe browser"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = ["saltcore", "salt-nacl-registry", "saltlab-factorlab"]
 
 [dependency-groups]
 dev = [
@@ -31,15 +31,23 @@ notebook = [
 
 [tool.uv]
 package = false
-default-groups = ["dev", "research", "notebook"]
+default-groups = ["dev"]
 
 [tool.uv.workspace]
-members = ["SaltCore", "SALTlab/Factorlab", "SALTlab/vollab", "Recipe"]
+members = ["SaltCore", "NaCl", "SALTlab/Factorlab", "SALTlab/vollab", "Recipe"]
 
 [tool.pytest.ini_options]
+markers = ["local_data: optional read-only checks against a local salt-data snapshot"]
 addopts = ["--import-mode=importlib"]
 testpaths = [
   "SaltCore/tests",
+  "NaCl/tests",
+  "SALTlab/Factorlab/tests",
   "SALTlab/vollab/tests",
   "Recipe/tests",
 ]
+
+[tool.uv.sources]
+saltcore = { workspace = true }
+salt-nacl-registry = { workspace = true }
+saltlab-factorlab = { workspace = true }

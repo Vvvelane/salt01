@@ -12,6 +12,7 @@ from functools import lru_cache
 import duckdb
 import pandas as pd
 
+from ._contracts import contract_files
 from ._index import Product, all_products, find_product
 from ._root import catalog_path
 
@@ -23,7 +24,9 @@ def _catalog(root: str | None) -> pd.DataFrame:
     """catalog 里的品种规格；catalog 缺失时退化成空表，不让调用方崩掉。"""
     path = catalog_path(root)
     if not path.exists():
-        return pd.DataFrame(columns=["product_id", "min_price_increment", "first_listing_date"])
+        return pd.DataFrame(
+            columns=["product_id", "min_price_increment", "first_listing_date"]
+        )
     with duckdb.connect(str(path), read_only=True) as con:
         return con.execute(
             "SELECT product_id, product_name, min_price_increment, "
@@ -84,13 +87,19 @@ def contracts(
 ) -> pd.DataFrame:
     """某品种在派生数据里有哪些合约文件。"""
     product = target if isinstance(target, Product) else find_product(str(target), root)
+    files = product.files(kind, freq)
+    sources = (
+        contract_files(product, files)
+        if kind == "all"
+        else {f.stem.upper(): [f] for f in files}
+    )
     rows = [
         {
-            "contract": f.stem.upper(),
-            "path": str(f),
-            "bytes": f.stat().st_size,
+            "contract": code,
+            "path": str(paths[0]),
+            "bytes": sum(f.stat().st_size for f in paths),
         }
-        for f in product.files(kind, freq)
+        for code, paths in sorted(sources.items())
     ]
     return pd.DataFrame(rows)
 

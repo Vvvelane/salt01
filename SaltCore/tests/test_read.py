@@ -1,3 +1,5 @@
+# ruff: noqa: DTZ001
+# Assertions use the source data's timezone-naive time labels.
 """SaltCore.read 的行为约定。
 
 这些测试直接打真实的 salt-data；根目录不在就整体跳过。
@@ -8,11 +10,12 @@ from __future__ import annotations
 import datetime as dt
 
 import pytest
-
 from saltcore.read import COLUMNS, SaltDataRootError, read_bars, scan
 from saltcore.read._index import split_contract
 from saltcore.read._spec import parse_targets, parse_time
 from saltcore.read.meta import contracts, parse_tick, products, tick_size
+
+pytestmark = pytest.mark.local_data
 
 try:
     products()
@@ -27,9 +30,9 @@ except (SaltDataRootError, OSError):  # pragma: no cover
     "value, side, expected",
     [
         (2020, "start", dt.datetime(2020, 1, 1)),
-        (2020, "end", dt.datetime(2020, 12, 31, 23, 59, 59)),
+        (2020, "end", dt.datetime(2020, 12, 31, 23, 59, 59, 999999)),
         ("2020-06", "start", dt.datetime(2020, 6, 1)),
-        ("2020-06", "end", dt.datetime(2020, 6, 30, 23, 59, 59)),
+        ("2020-06", "end", dt.datetime(2020, 6, 30, 23, 59, 59, 999999)),
         ("2020-06-30", "start", dt.datetime(2020, 6, 30)),
         ("2020-06-30 09:15", "start", dt.datetime(2020, 6, 30, 9, 15)),
         (dt.date(2020, 6, 30), "end", dt.datetime(2020, 6, 30, 23, 59, 59, 999999)),
@@ -62,7 +65,13 @@ def test_split_contract(token, expected):
 
 @pytest.mark.parametrize(
     "text, expected",
-    [("10人民币元/吨", 10.0), ("0.2指数点", 0.2), ("0.02人民币元/克", 0.02), (None, None), ("", None)],
+    [
+        ("10人民币元/吨", 10.0),
+        ("0.2指数点", 0.2),
+        ("0.02人民币元/克", 0.02),
+        (None, None),
+        ("", None),
+    ],
 )
 def test_parse_tick(text, expected):
     assert parse_tick(text) == expected
@@ -177,7 +186,9 @@ def test_bad_kind_rejected():
 
 
 def test_scan_aggregates_without_materialising():
-    got = scan("CU", kind="all").query("SELECT count(*) AS n, max(ts) AS last FROM bars")
+    got = scan("CU", kind="all").query(
+        "SELECT count(*) AS n, max(ts) AS last FROM bars"
+    )
     assert got.loc[0, "n"] > 10_000_000
     assert got.loc[0, "key"] == "SHFE.CU"
 
@@ -189,7 +200,9 @@ def test_scan_prunes_files_by_contract_window():
 
 
 def test_scan_and_read_agree_on_row_count():
-    counted = scan("CU", start="2026-08").query("SELECT count(*) AS n FROM bars").loc[0, "n"]
+    counted = (
+        scan("CU", start="2026-08").query("SELECT count(*) AS n FROM bars").loc[0, "n"]
+    )
     assert counted == len(read_bars("CU", start="2026-08").one())
 
 

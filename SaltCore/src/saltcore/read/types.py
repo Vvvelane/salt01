@@ -7,9 +7,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator
 
 import pandas as pd
 
@@ -54,10 +54,12 @@ class BarSlice:
             statement = f"WITH bars AS ({self.sql}), {body[5:]}"
         else:
             statement = f"WITH bars AS ({self.sql}) {body}"
-        return connect().execute(statement).df()
+        with connect() as con:
+            return con.execute(statement).df()
 
     def df(self) -> pd.DataFrame:
-        out = connect().execute(self.sql).df()
+        with connect() as con:
+            out = con.execute(self.sql).df()
         return out.reindex(columns=COLUMNS)
 
 
@@ -83,7 +85,9 @@ class BarScan:
 
     def one(self) -> BarSlice:
         if len(self.slices) != 1:
-            raise ValueError(f"one() 要求正好一个对象，当前有 {len(self.slices)} 个：{self.keys()}")
+            raise ValueError(
+                f"one() 要求正好一个对象，当前有 {len(self.slices)} 个：{self.keys()}"
+            )
         return next(iter(self.slices.values()))
 
     def query(self, select: str) -> pd.DataFrame:
@@ -96,7 +100,7 @@ class BarScan:
             parts.append(out)
         return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
 
-    def read(self) -> "BarSet":
+    def read(self) -> BarSet:
         return BarSet(
             frames={k: sl.df() for k, sl in self.slices.items()},
             products={k: sl.product for k, sl in self.slices.items()},
@@ -137,7 +141,9 @@ class BarSet:
     def one(self) -> pd.DataFrame:
         """只选了一个对象时，直接把那份 DataFrame 拿出来。"""
         if len(self.frames) != 1:
-            raise ValueError(f"one() 要求正好一个对象，当前有 {len(self.frames)} 个：{self.keys()}")
+            raise ValueError(
+                f"one() 要求正好一个对象，当前有 {len(self.frames)} 个：{self.keys()}"
+            )
         return next(iter(self.frames.values()))
 
     def concat(self) -> pd.DataFrame:
@@ -147,11 +153,15 @@ class BarSet:
             out = frame.copy()
             out.insert(0, "key", key)
             parts.append(out)
-        return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=["key", *COLUMNS])
+        return (
+            pd.concat(parts, ignore_index=True)
+            if parts
+            else pd.DataFrame(columns=["key", *COLUMNS])
+        )
 
     @property
     def meta(self) -> pd.DataFrame:
-        """每个对象读到了什么：行数、首末时间、覆盖的交易日、用了几个文件。"""
+        """每个对象读到了什么：行数、首末时间、源时间日期数（非交易日）、用了几个文件。"""
         rows = []
         for key, frame in self.frames.items():
             product = self.products.get(key)
@@ -163,7 +173,9 @@ class BarSet:
                     "rows": len(frame),
                     "first": frame["ts"].min() if len(frame) else None,
                     "last": frame["ts"].max() if len(frame) else None,
-                    "days": frame["ts"].dt.normalize().nunique() if len(frame) else 0,
+                    "timestamp_dates": frame["ts"].dt.normalize().nunique()
+                    if len(frame)
+                    else 0,
                     "contracts": frame["contract"].nunique() if len(frame) else 0,
                     "files": len(self.files.get(key, ())),
                 }
