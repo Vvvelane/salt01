@@ -1,0 +1,60 @@
+{
+  "phase": "phase1",
+  "source": "salt-data/派生数据/文档/重点品种分组明细（按交易所分组）.md",
+  "exchanges": [
+    {
+      "id": "SHFE",
+      "name": "上期所",
+      "products": [
+        {"id": "SHFE.RU", "code": "RU", "name": "天然橡胶"},
+        {"id": "SHFE.RB", "code": "RB", "name": "螺纹钢"},
+        {"id": "SHFE.AG", "code": "AG", "name": "白银"},
+        {"id": "SHFE.CU", "code": "CU", "name": "铜"},
+        {"id": "SHFE.NI", "code": "NI", "name": "镍"},
+        {"id": "SHFE.AU", "code": "AU", "name": "黄金"},
+        {"id": "SHFE.SN", "code": "SN", "name": "锡"}
+      ]
+    },
+    {
+      "id": "DCE",
+      "name": "大商所",
+      "products": [
+        {"id": "DCE.I", "code": "I", "name": "铁矿石"},
+        {"id": "DCE.JM", "code": "JM", "name": "焦煤"},
+        {"id": "DCE.M", "code": "M", "name": "豆粕"},
+        {"id": "DCE.P", "code": "P", "name": "棕榈油"},
+        {"id": "DCE.Y", "code": "Y", "name": "豆油"}
+      ]
+    },
+    {
+      "id": "CZCE",
+      "name": "郑商所",
+      "products": [
+        {"id": "CZCE.SA", "code": "SA", "name": "纯碱"},
+        {"id": "CZCE.CF", "code": "CF", "name": "棉花"},
+        {"id": "CZCE.SR", "code": "SR", "name": "白糖"},
+        {"id": "CZCE.OI", "code": "OI", "name": "菜籽油"}
+      ]
+    },
+    {
+      "id": "INE",
+      "name": "上期能源",
+      "products": [
+        {"id": "INE.SC", "code": "SC", "name": "原油"}
+      ]
+    },
+    {
+      "id": "CFFEX",
+      "name": "中金所",
+      "products": [
+        {"id": "CFFEX.IM", "code": "IM", "name": "中证1000"},
+        {"id": "CFFEX.IC", "code": "IC", "name": "中证500"},
+        {"id": "CFFEX.IF", "code": "IF", "name": "沪深300"},
+        {"id": "CFFEX.TL", "code": "TL", "name": "30年国债"},
+        {"id": "CFFEX.T", "code": "T", "name": "10年国债"},
+        {"id": "CFFEX.TF", "code": "TF", "name": "5年国债"},
+        {"id": "CFFEX.TS", "code": "TS", "name": "2年国债"}
+      ]
+    }
+  ]
+}

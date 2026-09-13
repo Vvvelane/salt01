@@ -1,0 +1,406 @@
+{
+  "version": "reference-costs-v1",
+  "as_of": "2026-09-09",
+  "purpose": "固定成本情景；不声称复原3/5/10年真实费用和保证金",
+  "products": {
+    "CFFEX.IC": {
+      "multiplier": 200.0,
+      "tick_size": 0.2,
+      "margin_rate": 0.12,
+      "fee_mode": "notional",
+      "open_fee": 2.3999999999999997e-05,
+      "close_fee": 2.3999999999999997e-05,
+      "close_today_fee": 0.00023,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 6,
+        "original_label": "中证500指数 IC"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:30",
+          "11:30"
+        ],
+        [
+          "13:00",
+          "15:00"
+        ]
+      ],
+      "night_end": null,
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。",
+        "平今按中金所2024-07公开费率0.00023单列；原表单向费率不足以表达日内成本。"
+      ]
+    },
+    "SHFE.AU": {
+      "multiplier": 1000,
+      "tick_size": 0.02,
+      "margin_rate": 0.2,
+      "fee_mode": "fixed",
+      "open_fee": 20.0,
+      "close_fee": 20.0,
+      "close_today_fee": 20.0,
+      "source": {
+        "url": "https://www.shfe.com.cn/publicnotice/notice/202505/t20250514_827756.html",
+        "note": "缺失项采用公开资料参考值；AU/CU保证金为明确的研究情景假设，非该合约历史实际标准。"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "02:30",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。"
+      ]
+    },
+    "SHFE.AG": {
+      "multiplier": 15.0,
+      "tick_size": 1.0,
+      "margin_rate": 0.12,
+      "fee_mode": "notional",
+      "open_fee": 5.1000000000000006e-05,
+      "close_fee": 5.1000000000000006e-05,
+      "close_today_fee": 5.1000000000000006e-05,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 20,
+        "original_label": "白银 AG"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "02:30",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。"
+      ]
+    },
+    "SHFE.CU": {
+      "multiplier": 5,
+      "tick_size": 10.0,
+      "margin_rate": 0.1,
+      "fee_mode": "notional",
+      "open_fee": 5e-05,
+      "close_fee": 5e-05,
+      "close_today_fee": 5e-05,
+      "source": {
+        "url": "https://www.shfe.cn/upload/ifd/20211011/1633918961952.pdf",
+        "note": "缺失项采用公开资料参考值；AU/CU保证金为明确的研究情景假设，非该合约历史实际标准。"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "01:00",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。"
+      ]
+    },
+    "SHFE.RB": {
+      "multiplier": 10.0,
+      "tick_size": 1.0,
+      "margin_rate": 0.07,
+      "fee_mode": "notional",
+      "open_fee": 0.000101,
+      "close_fee": 0.000101,
+      "close_today_fee": 0.000101,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 9,
+        "original_label": "螺纹钢 RM"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "23:00",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。",
+        "原表Sheet1!A9写螺纹钢RM；按中文品名与合约主数据修正为RB，不能映射到菜粕RM。"
+      ]
+    },
+    "SHFE.RU": {
+      "multiplier": 10.0,
+      "tick_size": 5.0,
+      "margin_rate": 0.08,
+      "fee_mode": "notional",
+      "open_fee": 2.2000000000000003e-05,
+      "close_fee": 2.2000000000000003e-05,
+      "close_today_fee": 2.2000000000000003e-05,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 21,
+        "original_label": "橡胶 RU"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "23:00",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。"
+      ]
+    },
+    "DCE.M": {
+      "multiplier": 10.0,
+      "tick_size": 1.0,
+      "margin_rate": 0.07,
+      "fee_mode": "notional",
+      "open_fee": 5.1000000000000006e-05,
+      "close_fee": 5.1000000000000006e-05,
+      "close_today_fee": 5.1000000000000006e-05,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 14,
+        "original_label": "豆粕 M"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "23:00",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。"
+      ]
+    },
+    "DCE.P": {
+      "multiplier": 10.0,
+      "tick_size": 1.0,
+      "margin_rate": 0.08,
+      "fee_mode": "notional",
+      "open_fee": 3.4e-05,
+      "close_fee": 3.4e-05,
+      "close_today_fee": 3.4e-05,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 5,
+        "original_label": "棕榈油 P",
+        "tick_override": {
+          "file": "派生数据/DCE-大连商品交易所/P-棕油/x.合约信息.csv",
+          "contract": "P2609",
+          "field": "最小报价单位说明",
+          "value": "1人民币元/吨"
+        }
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "23:00",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。",
+        "原费用表 tick=2 已过时；本次 2026-08 样本按当前合约主数据采用 tick=1。历史 tick 生效表仍待接入。"
+      ]
+    },
+    "DCE.JM": {
+      "multiplier": 60.0,
+      "tick_size": 0.5,
+      "margin_rate": 0.2,
+      "fee_mode": "notional",
+      "open_fee": 0.000101,
+      "close_fee": 0.000101,
+      "close_today_fee": 0.000101,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 3,
+        "original_label": "焦煤 JM"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "23:00",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。"
+      ]
+    },
+    "CZCE.CF": {
+      "multiplier": 5.0,
+      "tick_size": 5.0,
+      "margin_rate": 0.07,
+      "fee_mode": "notional",
+      "open_fee": 6.5e-05,
+      "close_fee": 6.5e-05,
+      "close_today_fee": 6.5e-05,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 19,
+        "original_label": "棉花 CF"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "23:00",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。"
+      ]
+    },
+    "CZCE.SR": {
+      "multiplier": 10.0,
+      "tick_size": 1.0,
+      "margin_rate": 0.07,
+      "fee_mode": "notional",
+      "open_fee": 5.4999999999999995e-05,
+      "close_fee": 5.4999999999999995e-05,
+      "close_today_fee": 5.4999999999999995e-05,
+      "source": {
+        "file": "派生数据/文档/副本手续费&滑点 2410222 .et",
+        "sheet": "Sheet1",
+        "row": 26,
+        "original_label": "白糖 SR"
+      },
+      "historical_fee_schedule": null,
+      "fee_model": "reference_scenario_not_broker_statement",
+      "day_segments": [
+        [
+          "09:00",
+          "10:15"
+        ],
+        [
+          "10:30",
+          "11:30"
+        ],
+        [
+          "13:30",
+          "15:00"
+        ]
+      ],
+      "night_end": "23:00",
+      "session_source": "本地合约信息+交易所当前交易时段；不按合约存续区间反推历史夜盘制度",
+      "notes": [
+        "平今未在原表区分的品种按相同单向参考费率，非历史实际费率。"
+      ]
+    }
+  }
+}
+
+

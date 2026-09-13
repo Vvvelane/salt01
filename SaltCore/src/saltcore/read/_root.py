@@ -1,4 +1,4 @@
-"""数据根目录与 catalog 定位。"""
+"""Locate the read-only salt-data root."""
 
 from __future__ import annotations
 
@@ -6,22 +6,14 @@ import os
 from pathlib import Path
 
 DERIVED = "派生数据"
-DEFAULT_ROOT = next(
-    (
-        parent / "salt-data"
-        for parent in Path(__file__).resolve().parents
-        if (parent / "salt-data" / DERIVED).is_dir()
-    ),
-    Path.cwd().parent / "salt-data",
-)
-CATALOG = "元数据/catalog.duckdb"
+DEFAULT_ROOT = Path.home() / "Developer" / "salt-data"
 
 
 class SaltDataRootError(RuntimeError):
     """数据根目录不存在或不是一个 salt-data 目录。"""
 
 
-def data_root(explicit: str | None = None) -> Path:
+def data_root(explicit: str | Path | None = None) -> Path:
     """解析 salt-data 根目录。
 
     优先级：显式参数 > 环境变量 SALT_DATA_ROOT > 默认路径。
@@ -35,9 +27,5 @@ def data_root(explicit: str | None = None) -> Path:
     return root
 
 
-def derived_root(explicit: str | None = None) -> Path:
+def derived_root(explicit: str | Path | None = None) -> Path:
     return data_root(explicit) / DERIVED
-
-
-def catalog_path(explicit: str | None = None) -> Path:
-    return data_root(explicit) / CATALOG

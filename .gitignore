@@ -21,4 +21,5 @@ dist/
 node_modules/
 NaCl/知识库笔记/
 
-SALTlab/Factorlab/runs/*/
+SALTlab/Factorlab/*/runs/*/
+SALTlab/.factorlab_pre_restructure_20260912/

@@ -1,0 +1,88 @@
+{
+  "version": "research11-v2",
+  "selection_basis": "用户指定的当下代表性研究池；历史回测存在当下选样偏差，不声称点时全市场Universe。",
+  "history_years": [
+    3,
+    5,
+    10
+  ],
+  "products": [
+    {
+      "product_id": "CFFEX.IC",
+      "name": "中证500",
+      "exchange": "CFFEX",
+      "sector": "equity_index",
+      "asset_class": "financial"
+    },
+    {
+      "product_id": "SHFE.AU",
+      "name": "黄金",
+      "exchange": "SHFE",
+      "sector": "precious_metals",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "SHFE.AG",
+      "name": "白银",
+      "exchange": "SHFE",
+      "sector": "precious_metals",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "SHFE.CU",
+      "name": "铜",
+      "exchange": "SHFE",
+      "sector": "industrial_metals",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "SHFE.RB",
+      "name": "螺纹钢",
+      "exchange": "SHFE",
+      "sector": "ferrous",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "SHFE.RU",
+      "name": "天然橡胶",
+      "exchange": "SHFE",
+      "sector": "industrial_materials",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "DCE.M",
+      "name": "豆粕",
+      "exchange": "DCE",
+      "sector": "agriculture",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "DCE.P",
+      "name": "棕榈油",
+      "exchange": "DCE",
+      "sector": "agriculture",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "DCE.JM",
+      "name": "焦煤",
+      "exchange": "DCE",
+      "sector": "ferrous",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "CZCE.CF",
+      "name": "棉花",
+      "exchange": "CZCE",
+      "sector": "agriculture",
+      "asset_class": "commodity"
+    },
+    {
+      "product_id": "CZCE.SR",
+      "name": "白糖",
+      "exchange": "CZCE",
+      "sector": "agriculture",
+      "asset_class": "commodity"
+    }
+  ]
+}

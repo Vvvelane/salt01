@@ -1,8 +1,5 @@
+.env
+node_modules/
+static/dist/
 __pycache__/
-*.py[cod]
-.pytest_cache/
-var/*.sqlite
-var/*.sqlite-*
-var/cache/
-.venv/
-
+*.egg-info/

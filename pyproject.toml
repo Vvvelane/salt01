@@ -1,32 +1,15 @@
 [project]
 name = "salt01-workspace"
 version = "0.1.0"
-description = "NaCl contracts, research packages, and the Recipe browser"
+description = "SALT shared data core and local research terminal"
 requires-python = ">=3.12,<3.13"
-dependencies = ["saltcore", "salt-nacl-registry", "saltlab-factorlab"]
+dependencies = ["recipe", "saltlab-factorlab"]
 
 [dependency-groups]
 dev = [
-  "hypothesis>=6.115",
-  "httpx>=0.28",
-  "mypy>=1.13",
-  "pre-commit>=4.0",
-  "pytest>=8.3",
-  "pytest-cov>=6.0",
+  "ipykernel>=7.3.0",
+  "matplotlib>=3.11.2",
   "ruff>=0.8",
-]
-research = [
-  "duckdb>=1.5,<2",
-  "pyarrow>=25,<26",
-  "scikit-learn>=1.9,<2",
-  "scipy>=1.17,<2",
-  "statsmodels>=0.14.6,<0.15",
-]
-notebook = [
-  "ipykernel>=6.29,<8",
-  "jupyterlab>=4.6,<5",
-  "matplotlib>=3.10,<4",
-  "seaborn>=0.13,<0.14",
 ]
 
 [tool.uv]
@@ -34,20 +17,9 @@ package = false
 default-groups = ["dev"]
 
 [tool.uv.workspace]
-members = ["SaltCore", "NaCl", "SALTlab/Factorlab", "SALTlab/vollab", "Recipe"]
-
-[tool.pytest.ini_options]
-markers = ["local_data: optional read-only checks against a local salt-data snapshot"]
-addopts = ["--import-mode=importlib"]
-testpaths = [
-  "SaltCore/tests",
-  "NaCl/tests",
-  "SALTlab/Factorlab/tests",
-  "SALTlab/vollab/tests",
-  "Recipe/tests",
-]
+members = ["SaltCore", "Recipe", "SALTlab/Factorlab"]
 
 [tool.uv.sources]
 saltcore = { workspace = true }
-salt-nacl-registry = { workspace = true }
+recipe = { workspace = true }
 saltlab-factorlab = { workspace = true }

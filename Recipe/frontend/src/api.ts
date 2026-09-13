@@ -1,27 +1,36 @@
-import type { ApiEnvelope, DatasetAvailability, DailyPayload, Exchange, Field, IntradayPayload, Product } from './types';
+import type { BarsResponse, FactorCatalog, FactorResults, Registry, Universe } from './types';
 
-async function request<T>(url: string): Promise<ApiEnvelope<T>> {
-  const response = await fetch(url);
+async function get<T>(path: string): Promise<T> {
+  const response = await fetch(path);
   const body = await response.json();
-  if (!response.ok) {
-    throw new Error(body.detail?.message || body.detail || `Request failed: ${response.status}`);
-  }
-  return body as ApiEnvelope<T>;
+  if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : '请求失败');
+  return body as T;
 }
 
 export const api = {
-  health: () => request<{ service: string; index: string; missing_views: string[] }>('/api/v2/health'),
-  exchanges: () => request<Exchange[]>('/api/v2/catalog/exchanges'),
-  products: (exchange?: string) => request<Product[]>(`/api/v2/catalog/products${exchange ? `?exchange=${encodeURIComponent(exchange)}` : ''}`),
-  availability: (productId: string) => request<{ product: Product; datasets: DatasetAvailability[] }>(`/api/v2/products/${encodeURIComponent(productId)}/availability`),
-  fields: (datasetKey?: string) => request<Field[]>(`/api/v2/catalog/fields${datasetKey ? `?dataset_key=${encodeURIComponent(datasetKey)}` : ''}`),
-  daily: (params: { product_id: string; mode: string; start: string; end: string; contracts?: string }) => {
-    const query = new URLSearchParams(params);
-    return request<DailyPayload>(`/api/v2/market/daily?${query.toString()}`);
+  universe: () => get<Universe>('/api/universe'),
+  cards: () => get<Registry>('/api/cards'),
+  factors: () => get<FactorCatalog>('/api/factors'),
+  factorResults: (params: { strategy: string; products: string[]; start?: string; end?: string }) => {
+    const query = new URLSearchParams({
+      strategy: params.strategy,
+      products: params.products.join(','),
+    });
+    if (params.start) query.set('start', params.start);
+    if (params.end) query.set('end', params.end);
+    return get<FactorResults>(`/api/factor-results?${query}`);
   },
-  intraday: (params: { product_id: string; trading_date: string; mode?: string; contract?: string; limit?: number }) => {
+  bars: (params: {
+    product: string;
+    start: string;
+    end: string;
+    freq: '1min' | 'daily';
+    contract?: string;
+  }) => {
     const query = new URLSearchParams();
-    Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
-    return request<IntradayPayload>(`/api/v2/market/intraday?${query.toString()}`);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) query.set(key, value);
+    });
+    return get<BarsResponse>(`/api/bars?${query}`);
   },
 };

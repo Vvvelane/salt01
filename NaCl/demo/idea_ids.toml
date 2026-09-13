@@ -1,0 +1,7 @@
+# 当前展示选择。具体策略规则与实现状态只读取 Factorlab/config/factors.json。
+[part2]
+ids = ["FTR001", "FRV001", "FID004", "FCM001", "FCA006"]
+center_id = "FTR001"
+
+[part3]
+ids = ["FTR001", "FRV001", "FID004", "FCM001", "FCA006"]

@@ -1,12 +1,17 @@
-# Factorlab implementation rules
+# Factorlab 开发规则
 
-Before editing executable research code, read `README.md` and `docs/01-boundaries.md` through `docs/06-invariants.md`.
+修改研究代码前，先阅读 `README.md`、相关的 `infra/docs`，以及目标因子的 `factor.md`。
+用户在当前对话中的新决定优先于本文件；发生冲突时按用户要求修改实现，并同步更新这里的旧规则。
 
-- This phase is a scaffold. Do not implement a backtest engine, strategy, sizing rule or visualization unless the active user task requests it.
-- An Idea Card is a research hypothesis. Its Strategy Translation and named `BT_*` profile are not automatically frozen execution policy.
-- Keep knowledge, factor construction, experiment definition, signal generation, execution, accounting and evaluation separate.
-- Every future feature must declare data cutoff and availability. Never feed forward labels into features, selection, normalization or sizing.
-- For future engine changes, cite the applicable invariant IDs in the change description and provide the corresponding small adversarial tests. Do not replace an unresolved assumption with a plausible default.
-- Read market data through `saltcore`; treat `salt-data` as read-only. Do not rebuild continuous contracts here.
-- Fail explicitly for missing execution semantics or unimplemented paths. Never return an empty result that appears to be a successful backtest.
-- Record data/config/code/registry versions and failed runs. Do not silently drop invalid bars, orders or losing trades.
+- 知识关系不是执行 DAG，也不是经济学上的继承树。
+- 所有策略规则统一保存在 `config/factors.json`；旧 NaCl Tab B 和“上层 label”不是已冻结的执行规则。
+- Factor 直接放在 Factorlab 下；只有至少两个 Factor 已经共用的代码才能进入 `infra`；因子独有构造放在该因子的 `dev/factor.py`。
+- 因子构造、交易意图、执行和记账保持分开。组合与账户级风险不属于当前 Factorlab v3。
+- 行情必须通过 saltcore 读取；salt-data 只读；Factorlab 不重建主力连续合约。
+- 使用正常安装后的 Python import，不修改 `sys.path`，不设置运行时 import fallback。
+- 没有明确研究任务时，不做参数网格或按收益结果反推参数。
+- 修改执行或记账代码时，应引用对应 invariant，并运行相关的小型反例测试。
+- 未知的历史语义保持为空；不为 pending 功能增加占位模块；被配置为 pending 的策略必须明确拒绝执行。
+- 不把 closed-bar 信息倒填到更早时刻，不制造分钟内价格路径，不把合成 bar 当成流动性，也不能删除已经成交的一条腿。
+- 记录精确配置、输入数据摘要、失败成交、完整交易和期末未平仓；生成最终验收结果期间不能继续修改代码。
+- 当前参考引擎不是 LEAN；没有实际运行的适配器、未经核验的历史费率或历史交易时段不能报告为已完成。

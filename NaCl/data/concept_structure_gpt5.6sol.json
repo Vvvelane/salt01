@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.1",
+  "scope": "本轮代表性 Idea 与构造关系；不是所有 58 Card 的执行依赖图",
+  "axes": {
+    "economic_family": "轴 A：经济假设家族（TRD/REV/...），见 cards_registry families",
+    "expression": "轴 B：家族内同一假设的不同表达，见 families[].expressions",
+    "structure": "轴 C：结构类型/标的范围/数据需求，只作 cards[].structure 属性",
+    "construction_kind": "Primitive/Derived/Composite 是原 Card 技术描述，非经济高低级",
+    "temporal_structure": "观测/形成窗口、可用时间与事件结构；持有与成交规则属于策略"
+  },
+  "relations": [
+    {
+      "from": "FTR001",
+      "to": "FRV001",
+      "type": "competes_with",
+      "note": "同一标准化净位移的相反读法；必须使用相同数据、窗口、成本和成交约定联合报告。"
+    },
+    {
+      "from": "FID004",
+      "to": "FTR001",
+      "type": "different_time_structure",
+      "note": "两者都可表达方向延续，但 FID004 是 session-anchored opening range，不是 FTR001 的子节点。"
+    },
+    {
+      "from": "FCM001",
+      "to": "FCM002",
+      "type": "competes_with",
+      "note": "截面动量与截面反转需要并排研究，当前只配置 FCM001 的组合路径。"
+    },
+    {
+      "from": "FCA006",
+      "to": "FCA007",
+      "type": "competes_with",
+      "note": "价差动量与基差反转是待研究的竞争解释；当前 FCA006 仍缺少多腿执行政策。"
+    }
+  ],
+  "implementation_bridge": {
+    "strategy_catalog": "../../SALTlab/Factorlab/config/factors.json",
+    "policy_owner": "Factorlab",
+    "display_owner": "NaCl/Recipe 可读取同一策略目录展示，禁止复制另一份参数",
+    "chain": [
+      "economic_hypothesis",
+      "mathematical_construction",
+      "feature_observation",
+      "strategy_intention",
+      "portfolio_target",
+      "risk_adjustment",
+      "order",
+      "fill",
+      "account"
+    ]
+  },
+  "selected_trend": {
+    "hypothesis_card": "FTR001",
+    "construction": "standardized_log_displacement",
+    "formula": "s_t = ln(C_t / C_{t-n}) / [sd_m(r_{<=t-1}) * sqrt(n)]",
+    "note": "FTR001 使用原卡的净位移。FRV001 使用同一量的相反符号；两者在经济上竞争、在数学上共享输入，而非父子关系。"
+  },
+  "pending": {
+    "mechanism_identification": null,
+    "fixed_displacement_clock": null,
+    "kalman_state_model": null,
+    "calendar_pair_selection": null,
+    "basket_execution": null
+  }
+}

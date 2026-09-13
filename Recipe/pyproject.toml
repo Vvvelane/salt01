@@ -5,23 +5,14 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "recipe"
 version = "0.1.0"
-description = "Read-only quantitative research data browser"
+description = "Local browser for SALT market data and NaCl cards"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-  "fastapi==0.115.6",
-  "uvicorn==0.34.0",
-  "duckdb>=1.5,<2",
-  "pyarrow>=25,<26",
-  "polars==1.17.1",
-  "pydantic>=2.13,<3",
-  "typing-extensions==4.14.1",
+  "fastapi>=0.115,<1",
+  "pandas>=2.2",
+  "saltcore",
+  "uvicorn>=0.34,<1",
 ]
-
-[project.optional-dependencies]
-test = ["pytest==8.3.4", "httpx==0.28.1"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]

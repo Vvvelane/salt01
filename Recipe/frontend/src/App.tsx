@@ -1,14 +1,39 @@
-import { useEffect, useState } from 'react';
-import { Atlas } from './views/Atlas';
-import { Research } from './views/Research';
-import { Workbench } from './views/Workbench';
+import { useState } from 'react';
+import { Cards } from './views/Cards';
+import { Factors } from './views/Factors';
+import { Market } from './views/Market';
+import { Tree } from './views/Tree';
 
-type Route = 'workbench' | 'atlas' | 'research';
-function route(): Route { const value = window.location.hash.replace('#/', ''); return value === 'atlas' || value === 'research' ? value : 'workbench'; }
+type Page = 'market' | 'tree' | 'cards' | 'factors';
 
 export function App() {
-  const [current, setCurrent] = useState<Route>(route());
-  useEffect(() => { const listener = () => setCurrent(route()); window.addEventListener('hashchange', listener); return () => window.removeEventListener('hashchange', listener); }, []);
-  const links: [Route, string][] = [['workbench', '品种工作台'], ['atlas', '数据目录'], ['research', 'Research']];
-  return <div className="shell"><header className="app-header"><div><div className="eyebrow">SALT01 · RECIPE</div><div className="brand">量化数据工作台</div></div><span className="readonly">READ ONLY</span></header><nav className="nav">{links.map(([value, label]) => <a key={value} href={`#/${value}`} className={current === value ? 'active' : ''}>{label}</a>)}</nav><main>{current === 'workbench' && <Workbench />}{current === 'atlas' && <Atlas />}{current === 'research' && <Research />}</main><footer>Recipe 只读消费 DuckDB Catalog · 不修改原始行情</footer></div>;
+  const [page, setPage] = useState<Page>('market');
+  const [focusCard, setFocusCard] = useState<string | null>(null);
+  function openCard(factorId: string) {
+    setFocusCard(factorId);
+    setPage('cards');
+  }
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <button className="brand" onClick={() => setPage('market')}>
+          <span className="brand-mark">S</span>
+          <span><b>SALT</b><small>RESEARCH TERMINAL</small></span>
+        </button>
+        <nav aria-label="主导航">
+          <button className={page === 'market' ? 'active' : ''} onClick={() => setPage('market')}>Market Data</button>
+          <button className={page === 'tree' ? 'active' : ''} onClick={() => setPage('tree')}>Factor Tree</button>
+          <button className={page === 'cards' ? 'active' : ''} onClick={() => setPage('cards')}>NaCl Registry</button>
+          <button className={page === 'factors' ? 'active' : ''} onClick={() => setPage('factors')}>Factor Results</button>
+        </nav>
+        <div className="phase-badge"><span /> Phase 1 · Local</div>
+      </header>
+      <main>
+        {page === 'market' && <Market />}
+        {page === 'tree' && <Tree onOpenCard={openCard} />}
+        {page === 'cards' && <Cards focusId={focusCard} />}
+        {page === 'factors' && <Factors />}
+      </main>
+    </div>
+  );
 }

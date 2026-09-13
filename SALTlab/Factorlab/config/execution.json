@@ -1,0 +1,21 @@
+{
+  "version": "factorlab-v3",
+  "fill_model": "signal_close_next_bar_open",
+  "slippage_ticks": 0,
+  "quantity": 1,
+  "allow_pyramiding": false,
+  "allow_same_bar_reversal": false,
+  "entry_cutoff_minutes_before_scope_end": 5,
+  "force_flat_minutes_before_scope_end": 5,
+  "reject_invalid_or_zero_volume_bar": true,
+  "flat_ohlc_day_policy": "exclude_trading_date",
+  "session_rules_mode": "current_rules_scenario",
+  "notes": [
+    "信号在已完成的bar收盘计算，只在下一根bar开盘尝试成交。",
+    "当前每个品种独立按一手运行，累计PnL从0开始；没有组合仓位与账户级风险控制。",
+    "scope收盘前5分钟进入平仓窗口：首个可交易open强平，窗口内禁止新开仓。",
+    "0滑点是当前明确的理想情景；手续费仍按品种分别扣除。",
+    "salt-data已有日度涨跌停表但本版尚未接入；任一有效平OHLC bar会使整个trading date退出信号构造和成交。",
+    "少量缺失或无效1min只跳过该观测，不排除整个session；观测窗口可以略长于墙钟时间。"
+  ]
+}

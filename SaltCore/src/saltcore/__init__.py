@@ -1,6 +1,5 @@
-"""简单统一的行情读取接口。"""
+"""Small, reusable access to SALT data."""
 
-from .read import COLUMNS, BarSet, read_bars, scan
-from .universe import core_universe
+from .read import COLUMNS, BarScan, BarSet, read_bars, scan
 
-__all__ = ["COLUMNS", "BarSet", "core_universe", "read_bars", "scan"]
+__all__ = ["COLUMNS", "BarScan", "BarSet", "read_bars", "scan"]

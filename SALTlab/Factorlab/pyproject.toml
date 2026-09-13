@@ -4,10 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "saltlab-factorlab"
-version = "0.2.0"
+version = "0.4.0"
 description = "Auditable futures factor research over published salt-data"
 requires-python = ">=3.12,<3.13"
-dependencies = ["saltcore", "salt-nacl-registry"]
+dependencies = ["numpy>=2,<3", "pandas>=2.2", "saltcore"]
+
+[project.scripts]
+factorlab = "infra.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["infra*", "ftr001*", "frv001*", "fid004*", "fcm001*"]
+namespaces = true
