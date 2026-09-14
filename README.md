@@ -1,5 +1,34 @@
 # SALT Research Terminal
 
+A research platform for Chinese futures, covering data integrity, a taxonomy of factor ideas, and
+execution-aware backtesting.
+
+**Live demo:** <https://saltlab-recipe.kangbohang.workers.dev>
+
+## Overview
+
+| Module | Role |
+|---|---|
+| [SaltCore](SaltCore/README.md) | Read-only access layer for 1-minute and daily bars from a local `salt-data` store |
+| [NaCl](NaCl/cards/families/00_index.md) | 58 factor ideas organized into 9 economic-mechanism families (trend, reversal, regime, volatility, activity/open interest, risk premia, carry, relative value, seasonality). Each card records the economic hypothesis, signal expression, structure and failure modes |
+| [Factorlab](SALTlab/Factorlab/README.md) | Implementation and backtests of 4 ideas as 7 strategy configurations across 11 products over 2016-09-08 to 2026-09-08: time-series momentum, short-term reversal, day/night opening-range breakout, and a cross-sectional commodity momentum basket |
+| [Recipe](Recipe/README.md) | Web interface for data-coverage monitoring, the factor taxonomy, backtest results and trade replay |
+
+**Backtest conventions.** Signals are formed at bar close and filled at the next bar's open.
+Single-asset strategies trade one contract with per-product fees and adverse tick slippage. Positions
+are closed 5 minutes before each session ends, are never exited at a different contract's price across
+rolls, and trading dates with invalid (flat) OHLC data are excluded. Known limitations, such as the main
+continuous series not being back-adjusted, are documented in
+[SALTlab/Factorlab/issues](SALTlab/Factorlab/issues/README.md).
+
+**Data.** Market data is not included in this repository. The code reads a local `salt-data` store
+through `SALT_DATA_ROOT`. The live demo serves pre-exported, read-only snapshots of completed results;
+see [Recipe/README.md](Recipe/README.md#公开演示站点).
+
+---
+
+以下为中文说明。
+
 | 目录 | 当前作用 |
 |---|---|
 | [SaltCore](SaltCore/README.md) | 共用的 1min / daily 行情读取接口 |
