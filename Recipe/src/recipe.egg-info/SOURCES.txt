@@ -1,9 +1,0 @@
-README.md
-pyproject.toml
-src/recipe/__init__.py
-src/recipe/app.py
-src/recipe.egg-info/PKG-INFO
-src/recipe.egg-info/SOURCES.txt
-src/recipe.egg-info/dependency_links.txt
-src/recipe.egg-info/requires.txt
-src/recipe.egg-info/top_level.txt

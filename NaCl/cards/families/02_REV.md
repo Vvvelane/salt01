@@ -49,7 +49,44 @@
 
 `Price` `Primitive` `Rolling`
 
-### Tab A — Idea Definition
+> **四段式 · 经济层** — 只定义规则的形式与符号，数值在 `SALTlab/Factorlab/config/factors.json`（可调，也是后续学习的对象）。执行、仓位、制度、研究边界规则不在四段里定义，共享部分见 [00_index.md](00_index.md#四段式卡片框架)。
+
+### 经济假设
+
+极端价格位移来自临时流动性压力；压力不是永久信息时价格回补。退出使用同一个信号。
+
+### 1. 构造
+
+$X_t=-\dfrac{\ln(C_t/C_{\text{anchor}})}{\hat\sigma_m\sqrt{n}}$，$\hat\sigma_m$ 只用到上一期。
+
+- **变体 A · 日内滚动**：锚点为 $n$ 根 bar 前的收盘价，窗口限于同 session、同合约；$\hat\sigma_m$ 为过去 $m$ 个单 bar 收益
+- **变体 B · 日尺度、逐 bar 扫描**：锚点为 $n$ 个交易日前的收盘价，每根已完成 bar 都计算；$\hat\sigma_m$ 为过去 $m$ 个日收益（只到前一交易日）；当前合约必须等于锚点合约，否则无效
+
+可用时点：第 $t$ 根 bar 收盘后。符号：$n$、$m$。
+
+### 2. 入场
+
+$\mathrm{pos}_{t-1}=0$ 且 $|X_t|>k$ → $\mathrm{pos}_t=\operatorname{sign}(X_t)$。
+
+### 3. 持仓更新
+
+无。
+
+### 4. 出场
+
+- **回补完成**：$X_t\cdot\mathrm{pos}_{t-1}\le b$ → $\mathrm{pos}_t=0$
+- **期限到期**：持有满 $n$（变体 A 为 $n$ 根，变体 B 为 $n$ 个交易日）→ $\mathrm{pos}_t=0$。期限由构造窗口 $n$ 推导，不是独立参数
+
+> ⚠ **层归属待确认**：期限出场在经济上是"临时压力应在窗口内消退"（架构 §13.1），但实现依赖入场时点 $\tau$，按 §6.3 判据属仓位层。滚动窗口本身不能保证 $n$ 根后过零，所以不能省掉这条。
+
+### 本卡不定义（卡片特有）
+
+无；共享规则见索引。
+
+### 附录 · 重构前原卡片（待清理，不作为四段式来源）
+
+
+#### Tab A — Idea Definition
 
 过去收益冲击取反；最基础的单价格过程反转 idea。
 
@@ -82,7 +119,7 @@ Composed With: `NA`
 
 **6. 工程角色 （Engineering role）待定**
 
-### Tab B — Strategy Translation
+#### Tab B — Strategy Translation
 
 **1. 信号 （Signal-to-Position Mapping 简单)**
 

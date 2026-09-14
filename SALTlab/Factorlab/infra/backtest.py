@@ -29,6 +29,7 @@ TRADE_COLUMNS = [
     "entry_reason",
     "exit_reason",
     "bars_held",
+    "trading_days_held",
     "gross_pnl",
     "entry_fee",
     "exit_fee",
@@ -83,7 +84,12 @@ def simulate(
     end_exclusive: str | pd.Timestamp,
     exact_quote: Callable[[str, pd.Timestamp], ExactQuote | None] | None = None,
 ) -> BacktestResult:
-    """Run the fixed v3 policy. A signal can only fill at the next row's open."""
+    """Run the fixed v3 policy. A signal can only fill, fill-or-kill, at the bar
+    `execution["execution_delay_bars"]` (default 0) rows after the next row's open;
+    delay_bars=0 keeps the original next-row-open behavior. Every fill is offset by
+    `instrument["slippage_ticks"] * instrument["tick_size"]` against the position:
+    worse (higher) for a long entry / short exit, worse (lower) for a short entry /
+    long exit."""
     joined = bars.join(signals)
     start_at, end_at = pd.Timestamp(start).normalize(), pd.Timestamp(end_exclusive).normalize()
     trading_dates = pd.to_datetime(joined["trading_date"])
@@ -98,6 +104,14 @@ def simulate(
     else:
         minutes_column = "minutes_to_trading_day_end" if scope_column == "trading_date" else "minutes_to_session_end"
     flat_window = execution["force_flat_minutes_before_scope_end"]
+    delay_bars = int(execution.get("execution_delay_bars", 0))
+    if delay_bars < 0:
+        raise ValueError("execution_delay_bars must be non-negative")
+    tick_size = float(instrument["tick_size"])
+    slippage_ticks = float(instrument["slippage_ticks"])
+    if slippage_ticks < 0:
+        raise ValueError("slippage_ticks must be non-negative")
+    slip = slippage_ticks * tick_size
     trades: list[dict] = []
     used_directions: set[tuple[str, int]] = set()
     position: dict | None = None
@@ -111,10 +125,14 @@ def simulate(
         record["gross_pnl"] += gross
         record["fees"] += fees
 
-    def close_position(row, price: float, reason: str, signal_time, signal_value) -> None:
+    def close_position(row, reference_price: float, reason: str, signal_time, signal_value) -> None:
+        """`reference_price` is the trigger/quoted price (bar open, or the stop level for a
+        range-touch exit); the actual fill is that price moved one slip against the position,
+        same as a real exit order would be filled worse than the quote."""
         nonlocal position, pending_exit
         assert position is not None
         side = position["side"]
+        price = reference_price - side * slip
         multiplier = float(instrument["multiplier"])
         gross = side * (price - position["entry_price"]) * multiplier
         same_day = str(row.trading_date) == position["trading_date"]
@@ -122,6 +140,14 @@ def simulate(
         mark_increment = side * (price - position["last_mark"]) * multiplier
         book(str(row.trading_date), gross=mark_increment, fees=exit_fee)
         position["accounted_gross"] += mark_increment
+        trade_residual = position["accounted_gross"] - gross
+        if abs(trade_residual) > 1e-6:
+            raise ArithmeticError(
+                "trade mark-to-market mismatch: "
+                f"{strategy['strategy_id']} {product_id} "
+                f"{position['entry_time']} -> {getattr(row, 'open_time', row.ts)} "
+                f"contract={position['contract']} residual={trade_residual}"
+            )
         mfe = max(0.0, position["mfe"])
         giveback = (mfe - gross) / mfe if mfe > 0 else np.nan
         trades.append(
@@ -144,6 +170,7 @@ def simulate(
                 "entry_reason": "signal_threshold",
                 "exit_reason": reason,
                 "bars_held": position["bars_held"],
+                "trading_days_held": position["trading_days_held"],
                 "gross_pnl": gross,
                 "entry_fee": position["entry_fee"],
                 "exit_fee": exit_fee,
@@ -182,9 +209,8 @@ def simulate(
                 execution_high = quote.high
                 execution_low = quote.low
                 execution_close = quote.close
-                excluded_day = bool(getattr(row, "flat_ohlc_day", False))
-                execution_valid = quote.valid and not excluded_day
-                execution_tradable = quote.tradable and not excluded_day
+                execution_valid = quote.valid
+                execution_tradable = quote.tradable
                 execution_quote_available = True
 
         if position is not None and previous_scope is not None and scope != previous_scope and pending_exit is None:
@@ -209,23 +235,59 @@ def simulate(
                 pending_exit["signal_value"],
             )
 
+        expiry_lookup = (
+            getattr(exact_quote, "last_trading_date", None)
+            if scope_column == "research_scope"
+            else None
+        )
+        row_expiry_window = False
+        if callable(expiry_lookup) and pd.notna(row.contract):
+            row_expiry_window = (
+                str(row.trading_date) == expiry_lookup(str(row.contract))
+                and 0 < float(row.minutes_to_trading_day_end) <= flat_window
+            )
+        in_expiry_window = False
+        if position is not None and callable(expiry_lookup):
+            in_expiry_window = (
+                str(row.trading_date) == expiry_lookup(position["contract"])
+                and 0 < float(row.minutes_to_trading_day_end) <= flat_window
+            )
+        if position is not None and in_expiry_window:
+            if execution_tradable and execution_quote_available:
+                close_position(
+                    row,
+                    execution_open,
+                    "contract_last_trading_day",
+                    execution_time,
+                    row.value,
+                )
+            elif pending_exit is None:
+                pending_exit = {
+                    "reason": "contract_last_trading_day_delayed",
+                    "signal_time": execution_time,
+                    "signal_value": row.value,
+                }
+
         if position is not None and in_flat_window:
             if execution_tradable and execution_quote_available:
                 close_position(row, execution_open, "forced_scope_close", execution_time, row.value)
             elif pending_exit is None:
                 pending_exit = {"reason": "forced_scope_close_delayed", "signal_time": execution_time, "signal_value": row.value}
 
-        if pending_entry is not None:
+        if pending_entry is not None and row_number == pending_entry["row_number"] + 1 + delay_bars:
+            # Fill-or-kill at exactly this one bar: delay_bars only pushes out *which* bar is
+            # tried, it does not open a retry window. Bars in between (when delay_bars > 0)
+            # leave pending_entry untouched above, so it survives until this row is reached.
             eligible = (
-                pending_entry["row_number"] + 1 == row_number
-                and pending_entry["scope"] == scope
+                pending_entry["scope"] == scope
                 and bool(row.tradable)
                 and not in_flat_window
+                and not row_expiry_window
                 and row.contract == pending_entry["contract"]
                 and position is None
             )
             if eligible:
-                price = float(row.open)
+                price = float(row.open) + pending_entry["side"] * slip
                 position = {
                     "side": pending_entry["side"],
                     "contract": row.contract,
@@ -237,6 +299,8 @@ def simulate(
                     "entry_fee": _fee(instrument, price, "open", True),
                     "trading_date": str(row.trading_date),
                     "bars_held": 0,
+                    "trading_days_held": 0,
+                    "last_holding_trading_date": None,
                     "mfe": 0.0,
                     "mae": 0.0,
                     "stop": pending_entry["stop"],
@@ -271,6 +335,10 @@ def simulate(
                 position["mfe"] = max(position["mfe"], float(favorable))
                 position["mae"] = min(position["mae"], float(adverse))
                 position["bars_held"] += 1
+                current_trading_date = str(row.trading_date)
+                if position["last_holding_trading_date"] != current_trading_date:
+                    position["trading_days_held"] += 1
+                    position["last_holding_trading_date"] = current_trading_date
                 position["last_time"] = row.ts
                 position["last_signal"] = row.value
 
@@ -286,6 +354,12 @@ def simulate(
                     exit_reason = "max_holding_bars"
                 if exit_reason is None and strategy.get("derived_holding_bars") == "lookback_bars" and position["bars_held"] >= strategy["lookback_bars"]:
                     exit_reason = "derived_horizon"
+                if (
+                    exit_reason is None
+                    and strategy.get("derived_holding_trading_days") == "lookback_days"
+                    and position["trading_days_held"] >= strategy["lookback_days"]
+                ):
+                    exit_reason = "derived_daily_horizon"
                 if exit_reason is not None:
                     pending_exit = {"reason": exit_reason, "signal_time": row.ts, "signal_value": row.value}
 
@@ -297,8 +371,10 @@ def simulate(
 
         if (
             position is None
+            and pending_entry is None
             and pending_exit is None
             and not in_flat_window
+            and not row_expiry_window
             and bool(row.signal_valid)
         ):
             value = float(row.value)
@@ -337,7 +413,15 @@ def simulate(
     if len(trade_frame):
         residual = float(pnl["net_pnl"].sum() - trade_frame["net_pnl"].sum())
         if abs(residual) > 1e-6:
-            raise ArithmeticError(f"daily/trade PnL mismatch: {residual}")
+            raise ArithmeticError(
+                f"daily/trade PnL mismatch: {residual}; "
+                f"open_position={position is not None}; "
+                f"ledger_gross={pnl['gross_pnl'].sum()}; "
+                f"trade_gross={trade_frame['gross_pnl'].sum()}; "
+                f"ledger_fees={pnl['fees'].sum()}; "
+                f"trade_fees={trade_frame['total_fee'].sum()}; "
+                f"position={position}"
+            )
     equity = pd.concat([pd.Series([0.0]), pnl["cumulative_net_pnl"]], ignore_index=True)
     drawdown = equity - equity.cummax()
     summary = {

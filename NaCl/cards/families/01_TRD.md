@@ -73,7 +73,44 @@
 
 `Price` `Primitive` `Rolling`
 
-### Tab A — Idea Definition
+> **四段式 · 经济层** — 只定义规则的形式与符号，数值在 `SALTlab/Factorlab/config/factors.json`（可调，也是后续学习的对象）。执行、仓位、制度、研究边界规则不在四段里定义，共享部分见 [00_index.md](00_index.md#四段式卡片框架)。
+
+### 经济假设
+
+过去价格净位移的方向会在之后延续；只看窗口起点和终点，不描述中间路径。
+
+### 1. 构造
+
+$r_t=\ln C_t-\ln C_{t-1}$（同合约、同 scope 内）；$\hat\sigma_m$ 为过去 $m$ 个单 bar 收益的标准差，只用到 $t-1$。
+
+- **变体 A · 滚动窗口**：$X_t=\dfrac{\ln(C_t/C_{t-n})}{\hat\sigma_m\sqrt{n}}$
+- **变体 B · 交易日锚定**：$X_t=\dfrac{\ln(C_t/O_D)}{\hat\sigma_m\sqrt{E_t}}$，$O_D$ 为交易日第一根 bar 的开盘价，$E_t$ = 已完成有效 bar 数 + 已发生的跨时段缺口等效 bar 数；$E_t<E_{\min}$ 时信号无效
+
+可用时点：第 $t$ 根 bar 收盘后。符号：$n$、$m$、$E_{\min}$；缺口等效系数是逐品种测量值，不是参数。
+
+### 2. 入场
+
+$\mathrm{pos}_{t-1}=0$ 且 $|X_t|>k$ → $\mathrm{pos}_t=\operatorname{sign}(X_t)$。
+
+### 3. 持仓更新
+
+无。持仓期间只重新读取 $X_t$ 用于出场判断，不改变方向或规模。
+
+### 4. 出场
+
+$X_t\cdot\mathrm{pos}_{t-1}\le b$ → $\mathrm{pos}_t=0$（$b$ 的经济自然值为 0，见架构 §3.3）。
+
+### 本卡不定义（卡片特有）
+
+| 规则 | 层 | 为什么不属于经济层 |
+| --- | --- | --- |
+| 变体 A：持有满固定根数兜底退出 | 仓位层 | 依赖入场时点 $\tau$，与 $X_t$ 无关 |
+| 变体 B：同方向每个 scope 只入场一次 | 仓位层 | 依赖本方向是否已交易过（交易史），不是 $X_t$ |
+
+### 附录 · 重构前原卡片（待清理，不作为四段式来源）
+
+
+#### Tab A — Idea Definition
 
 净位移；基础版本只关心起点和终点，不描述中间价格路径。
 
@@ -100,7 +137,7 @@ Composed With: `NA`
 
 **6. 工程角色 （Engineering role）待定**
 
-### Tab B — Strategy Translation
+#### Tab B — Strategy Translation
 
 **1. 信号 （Signal-to-Position Mapping 简单)**
 
@@ -452,7 +489,50 @@ Trailing Exit：`无；t 值衰减是信号退出。`
 
 `Price` `Derived` `Cross-Sectional`
 
-### Tab A — Idea Definition
+> **四段式 · 经济层** — 只定义规则的形式与符号，数值在 `SALTlab/Factorlab/config/factors.json`（可调，也是后续学习的对象）。执行、仓位、制度、研究边界规则不在四段里定义，共享部分见 [00_index.md](00_index.md#四段式卡片框架)。
+
+### 经济假设
+
+相对自身正常波动更强的商品，未来继续强于其他商品；更弱的继续偏弱。它是相对排序，不表示单个品种的绝对方向。
+
+### 1. 构造
+
+$r_{i,t}=\ln(C_{i,t}/C_{i,t-1})$，主连换月日记为缺失（未复权价差不是持仓收益）。
+
+$s_{i,t}=\dfrac{\sum_{\text{最近 }n\text{ 个交易日}}r_{i}}{\hat\sigma_{i,m}\sqrt{n}}$，$\hat\sigma_{i,m}$ 为过去 $m$ 个日收益、只用到 $t-1$。
+
+截面平均排名 $R_i$ → $p_i=(N-R_i+0.5)/N$ → $g_i=2p_i-1\in(-1,1)$。有效品种数 $N<N_{\min}$ 时不形成新排名。
+
+可用时点：交易日收盘后。符号：$n$、$m$、$N_{\min}$、入场分位 $q_{in}$、保留分位 $q_{out}$。
+
+### 2. 入场
+
+$\mathrm{pos}_{i}=0$ 且 $g_i\ge g_{in}$ → 多；$g_i\le-g_{in}$ → 空；$g_{in}=1-2q_{in}$。
+
+### 3. 持仓更新
+
+每个交易日重新排名。已持有成员只要仍在缓冲区内就保留：多头 $g_i\ge g_{out}$，空头 $g_i\le-g_{out}$，$g_{out}=1-2q_{out}<g_{in}$。
+
+这是入场与退出阈值不同的迟滞，只依赖 $g$ 和上一期持仓，属经济层。
+
+### 4. 出场
+
+多头 $g_i<g_{out}$、空头 $g_i>-g_{out}$ → 该腿 $\mathrm{pos}_i=0$。
+
+### 本卡不定义（卡片特有）
+
+| 规则 | 层 | 为什么不属于经济层 |
+| --- | --- | --- |
+| 每边固定容量，只有退出产生空位才补入 | 仓位层 | 依赖当前持有成员数 |
+| 腿内等权 | 仓位层 | 规模规则 |
+| 整篮子全成或全不成 | 执行 | 成交约束 |
+| 换月前一交易日平掉该腿 | 制度层 | 合约规则 |
+| 样本期末全部清仓 | 回测边界 | 不是交易规则 |
+
+### 附录 · 重构前原卡片（待清理，不作为四段式来源）
+
+
+#### Tab A — Idea Definition
 
 过去相对表现最强的商品继续强于最弱商品，可能来自跨市场信息扩散、行为延迟和风险差异。
 
@@ -490,7 +570,7 @@ Composed With: `NA`
 
 **6. 工程角色 （Engineering role）待定**
 
-### Tab B — Strategy Translation
+#### Tab B — Strategy Translation
 
 **1. 信号 （Signal-to-Position Mapping 简单)**
 
@@ -517,7 +597,7 @@ Trailing Exit：`Not specified`
 
 **5. 仓位大小：Position Sizing**
 
-### 建议补充
+#### 建议补充
 
 必须单独报告：
 
@@ -979,7 +1059,47 @@ Trailing Exit：`使用上述退出通道，或单独注册`3×ATR Chandelier`�
 
 `OHLC` `Derived` `Event` `Intraday`
 
-### Tab A — Idea Definition
+> **四段式 · 经济层** — 只定义规则的形式与符号，数值在 `SALTlab/Factorlab/config/factors.json`（可调，也是后续学习的对象）。执行、仓位、制度、研究边界规则不在四段里定义，共享部分见 [00_index.md](00_index.md#四段式卡片框架)。
+
+### 经济假设
+
+开盘区间外的持续突破代表当日信息冲击延续；收益集中在右尾。
+
+### 1. 构造
+
+每个 session 前 $m_{or}$ 根有效 bar 形成开盘区间并冻结：$H=\max(\text{High})$，$L=\min(\text{Low})$，$\text{mid}=(H+L)/2$，$hw=(H-L)/2$。
+
+$X_t=\dfrac{C_t-\text{mid}}{hw}$
+
+形成期结束前无信号；区间不能混合两个合约。可用时点：第 $t$ 根 bar 收盘后（必须由收盘价确认）。符号：$m_{or}$。
+
+### 2. 入场
+
+$\mathrm{pos}_{t-1}=0$ 且 $|X_t|>k$ → $\mathrm{pos}_t=\operatorname{sign}(X_t)$。
+
+### 3. 持仓更新
+
+跟踪持仓期间信号的最有利值：$P_t=\max_{\tau\le u\le t}X_u\cdot\mathrm{pos}$。
+
+> ⚠ $P_t$ 依赖入场时点 $\tau$，按架构 §6.4 属经济与仓位不可分（registry 已标 `layer_separable: false`），结论不能与可分离的卡片直接并列比较。
+
+### 4. 出场
+
+- **突破证伪**：$X_t\cdot\mathrm{pos}_{t-1}\le b$（跌回区间中点）
+- **自峰值回撤**：$P_t-X_t\cdot\mathrm{pos}_{t-1}>d$（回撤超过 $d$ 个半区间宽）
+- **结构失效**：价格触及区间另一侧（多头触及 $L$，空头触及 $H$），即 bar 内 $X\le-1$ / $X\ge1$。它依赖市场结构位置而不是入场价，按 §6.3 属经济层；按止损价还是跳空 open 成交属执行
+
+### 本卡不定义（卡片特有）
+
+| 规则 | 层 | 为什么不属于经济层 |
+| --- | --- | --- |
+| 同方向每个 session 只入场一次 | 仓位层 | 依赖交易史 |
+| 单笔风险超过上限则跳过 | 仓位层 | 依赖账户资金；当前未建立，未实现 |
+
+### 附录 · 重构前原卡片（待清理，不作为四段式来源）
+
+
+#### Tab A — Idea Definition
 
 早盘区间外的持续突破可能代表当日信息冲击延续；这是 trading-range break 的低频日内迁移。
 
@@ -1007,7 +1127,7 @@ Composed With: `Opening Range + Breakout Event`
 
 **6. 工程角色 （Engineering role）待定**
 
-### Tab B — Strategy Translation
+#### Tab B — Strategy Translation
 
 **1. 信号 （Signal-to-Position Mapping 简单)**
 

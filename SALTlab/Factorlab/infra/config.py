@@ -35,14 +35,14 @@ def validate_strategy(strategy: dict) -> None:
         and strategy["entry_threshold"] <= strategy["exit_threshold"]
     ):
         raise ValueError("entry threshold must be above exit threshold")
-    if strategy["implementation"] in ("rolling_displacement", "daily_reversal"):
+    if strategy["implementation"] == "rolling_displacement":
         if strategy["lookback_bars"] < 1 or strategy["volatility_lookback"] < 2:
             raise ValueError("rolling windows must be positive")
-        if strategy["implementation"] == "daily_reversal" and (
-            strategy["frequency"] != "daily"
-            or strategy["holding_scope"] != "research_period"
-        ):
-            raise ValueError("daily reversal must use daily bars and research-period holding")
+    elif strategy["implementation"] == "daily_scale_displacement":
+        if strategy["lookback_days"] < 1 or strategy["volatility_lookback_days"] < 2:
+            raise ValueError("daily-scale windows must be positive")
+        if strategy["frequency"] != "1min" or strategy["holding_scope"] != "research_period":
+            raise ValueError("daily-scale displacement must scan 1min bars and allow overnight holding")
     elif strategy["implementation"] == "trading_day_anchor":
         if strategy["minimum_elapsed_bars"] < 1:
             raise ValueError("minimum_elapsed_bars must be positive")
@@ -86,11 +86,19 @@ def execution() -> dict:
         raise NotImplementedError("Only the v3 next-open execution is implemented")
     if value["quantity"] != 1 or value["allow_pyramiding"]:
         raise NotImplementedError("The current study is exactly one lot per product")
+    if value["execution_delay_bars"] < 0:
+        raise ValueError("execution_delay_bars must be non-negative")
     return value
 
 
 def instruments() -> dict[str, dict]:
-    return read_json(CONFIG_DIR / "instruments.json")["products"]
+    products = read_json(CONFIG_DIR / "instruments.json")["products"]
+    for product_id, info in products.items():
+        if info.get("slippage_ticks") is None or info.get("tick_size") is None:
+            raise ValueError(f"{product_id}: instruments.json must set both tick_size and slippage_ticks")
+        if info["slippage_ticks"] < 0:
+            raise ValueError(f"{product_id}: slippage_ticks must be non-negative")
+    return products
 
 
 def universe() -> list[dict]:

@@ -1,132 +1,119 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { useLanguage } from '../i18n';
 import { OhlcChart } from '../components/OhlcChart';
 import type { Bar, BarsResponse, Product, Universe } from '../types';
+import '../research.css';
 
-const DAILY_RANGE = { start: '2026-01-01', end: '2026-09-07' };
-const MINUTE_RANGE = { start: '2026-09-01', end: '2026-09-07' };
+type Selection = { product: Product; contract?: string };
+const keyOf = (s: Selection) => `${s.product.id}/${s.contract ?? 'MAIN'}`;
 
-function number(value: number | null | undefined, digits = 2) {
-  return value == null ? '—' : value.toLocaleString('zh-CN', { maximumFractionDigits: digits });
+function MarketPane({ selection, onRemove }: { selection: Selection; onRemove: () => void }) {
+  const { t } = useLanguage();
+  const [daily, setDaily] = useState<BarsResponse>();
+  const [minute, setMinute] = useState<BarsResponse>();
+  const [anchor, setAnchor] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const pane = useRef<HTMLElement>(null);
+  const [error, setError] = useState('');
+  const inspected = useRef<Bar | undefined>(undefined);
+  const request = useRef<AbortController | null>(null);
+  const fetching = useRef(false);
+  const minuteRef = useRef(minute); minuteRef.current = minute;
+  const { product, contract } = selection;
+  useEffect(() => {
+    const controller = new AbortController(); setError('');
+    api.bars({ product: product.id, contract, freq: 'daily' }, controller.signal).then(setDaily).catch((e) => { if (!controller.signal.aborted) setError(String(e)); });
+    return () => { controller.abort(); request.current?.abort(); };
+  }, [product.id, contract, retry]);
+  useEffect(() => {
+    if (!expanded) return;
+    const old = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = old; };
+  }, [expanded]);
+  useEffect(() => { if (!anchor && daily) pane.current?.querySelector<HTMLElement>('.ohlc-interactive')?.focus({ preventScroll: true }); }, [anchor]);
+  const back = () => { request.current?.abort(); fetching.current = false; setBusy(false); setMinute(undefined); setAnchor(''); setError(''); };
+  const drill = (bar?: Bar) => {
+    if (!bar) return;
+    request.current?.abort(); const controller = new AbortController(); request.current = controller;
+    const date = `${bar.ts.slice(0, 10)}T09:00:00`;
+    setAnchor(date); setBusy(true); setError(''); fetching.current = true;
+    api.bars({ product: product.id, contract, freq: '1min', anchor: date }, controller.signal).then(setMinute)
+      .catch((e) => { if (!controller.signal.aborted) setError(String(e)); })
+      .finally(() => { if (!controller.signal.aborted) { setBusy(false); fetching.current = false; } });
+  };
+  const loadEdge = useCallback((edge: 'before' | 'after') => {
+    const current = minuteRef.current;
+    if (!current || fetching.current || !(edge === 'before' ? current.has_before : current.has_after) || !current.rows.length) return;
+    const controller = new AbortController(); request.current = controller; fetching.current = true; setBusy(true);
+    const boundary = edge === 'before' ? current.rows[0].ts : current.rows.at(-1)!.ts;
+    api.bars({ product: product.id, contract, freq: '1min', [edge]: boundary }, controller.signal).then((page) => {
+      setMinute((old) => {
+        if (!old) return old;
+        const rows = [...new Map([...old.rows, ...page.rows].map((bar) => [bar.ts, bar])).values()].sort((a, b) => a.ts.localeCompare(b.ts));
+        return { ...old, rows, [edge === 'before' ? 'has_before' : 'has_after']: edge === 'before' ? page.has_before : page.has_after };
+      });
+    }).catch((e) => { if (!controller.signal.aborted) setError(String(e)); })
+      .finally(() => { if (!controller.signal.aborted) { fetching.current = false; setBusy(false); } });
+  }, [product.id, contract]);
+  const controls = <><b>{contract ?? `${product.code} · ${t('主连', 'Continuous')}`}</b><span>{t(product.name, product.code)}</span>
+    <button className={!anchor ? 'active' : ''} onClick={back}>Daily</button>
+    <button className={anchor ? 'active' : ''} onClick={() => { if (!anchor) drill(inspected.current ?? daily?.rows.at(-1)); }}>1min</button>
+    {anchor && <button onClick={back}>Esc · Daily ↩</button>}
+    {busy && <span className="subtle">{t('读取中…', 'Loading…')}</span>}
+    <button onClick={() => setExpanded(!expanded)} aria-label={t('放大图表', 'Expand chart')}>{expanded ? '↙' : '↗'}</button>
+    <button onClick={onRemove} aria-label={t('移除合约', 'Remove contract')}>×</button></>;
+  return <section ref={pane} className={`market-pane${expanded ? ' chart-fullscreen' : ''}`} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); if (anchor) back(); else setExpanded(false); } }}>
+    {error && <div className="error-banner">{error}<button onClick={() => { setError(''); if (anchor) drill(inspected.current ?? daily?.rows.at(-1)); else setRetry((r) => r + 1); }}>{t('重试', 'Retry')}</button></div>}
+    {/* Keep daily mounted while drilling, preserving its exact zoom and cursor. */}
+    <div hidden={Boolean(minute)}>{daily ? <OhlcChart bars={daily.rows} daily active={!minute} expanded={expanded} controls={controls} onBarClick={drill} onInspect={(bar) => { inspected.current = bar; }} /> : <div className="chart-empty">{t('读取完整历史…', 'Loading full history…')}<button onClick={onRemove}>×</button></div>}</div>
+    {minute && <OhlcChart key={anchor} bars={minute.rows} daily={false} anchor={anchor} onEdge={loadEdge} controls={controls} expanded={expanded} />}
+  </section>;
 }
 
-export function Market() {
-  const [universe, setUniverse] = useState<Universe | null>(null);
-  const [product, setProduct] = useState<Product | null>(null);
-  const [frequency, setFrequency] = useState<'1min' | 'daily'>('daily');
-  const [range, setRange] = useState(DAILY_RANGE);
-  const [mode, setMode] = useState<'product' | 'contract'>('product');
-  const [contract, setContract] = useState('');
-  const [result, setResult] = useState<BarsResponse | null>(null);
-  const [selected, setSelected] = useState<Bar | null>(null);
-  const [loading, setLoading] = useState(false);
+export function MarketInspector({ initialProductId }: { initialProductId?: string }) {
+  const { t } = useLanguage();
+  const [universe, setUniverse] = useState<Universe>();
+  const [productId, setProductId] = useState('');
+  const [contracts, setContracts] = useState<{ contract: string; start: string; end: string }[]>([]);
+  const [selected, setSelected] = useState<Selection[]>([]);
+  const [loadingContracts, setLoadingContracts] = useState(false);
   const [error, setError] = useState('');
-
-  async function loadBars(target: Product, start: string, end: string, freq: '1min' | 'daily', contractCode = '') {
-    setLoading(true);
-    setError('');
-    try {
-      const payload = await api.bars({ product: target.id, start, end, freq, contract: contractCode || undefined });
-      setResult(payload);
-      setSelected(payload.rows.at(-1) ?? null);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  useEffect(() => { api.universe().then((data) => {
+    setUniverse(data);
+    const products = data.exchanges.flatMap((exchange) => exchange.products);
+    const initial = products.find((item) => item.id === initialProductId) ?? products.find((item) => item.id === 'SHFE.AU') ?? products[0];
+    if (initial) { setProductId(initial.id); setSelected([{ product: initial }]); }
+  }).catch((e) => setError(String(e))); }, [initialProductId]);
   useEffect(() => {
-    api.universe().then((data) => {
-      setUniverse(data);
-      const initial = data.exchanges.flatMap((exchange) => exchange.products).find((item) => item.id === 'SHFE.AU') ?? data.exchanges[0]?.products[0];
-      if (initial) {
-        setProduct(initial);
-        void loadBars(initial, DAILY_RANGE.start, DAILY_RANGE.end, 'daily');
-      }
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)));
-  }, []);
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (product) void loadBars(product, range.start, range.end, frequency, mode === 'contract' ? contract : '');
-  }
-
-  function changeFrequency(value: '1min' | 'daily') {
-    setFrequency(value);
-    setRange(value === '1min' ? MINUTE_RANGE : DAILY_RANGE);
-  }
-
-  const summary = useMemo(() => {
-    const rows = result?.rows ?? [];
-    const first = rows.find((bar) => bar.close != null);
-    const last = [...rows].reverse().find((bar) => bar.close != null);
-    const change = first?.close && last?.close ? (last.close / first.close - 1) * 100 : null;
-    const contracts = new Set(rows.map((bar) => bar.contract).filter(Boolean));
-    return { first, last, change, contracts: contracts.size };
-  }, [result]);
-
-  return (
-    <div className="page-grid market-page">
-      <aside className="sidebar">
-        <div className="sidebar-heading"><span>PHASE 1 UNIVERSE</span><b>24</b></div>
-        {universe?.exchanges.map((exchange) => (
-          <section className="exchange-group" key={exchange.id}>
-            <div className="exchange-title"><span>{exchange.name}</span><small>{exchange.id}</small></div>
-            <div className="product-grid">
-              {exchange.products.map((item) => (
-                <button key={item.id} className={product?.id === item.id ? 'selected' : ''} onClick={() => { setProduct(item); setResult(null); setSelected(null); }}>
-                  <b>{item.code}</b><span>{item.name}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ))}
-        <p className="source-note">清单只保存品种选择，来源为 salt-data 中的重点品种分组文档。</p>
-      </aside>
-
-      <section className="workspace">
-        <div className="page-heading">
-          <div><span className="kicker">MARKET DATA / SALTCORE</span><h1>{product ? `${product.code} · ${product.name}` : '行情读取'}</h1><p>统一读取 1min 与 daily OHLCVA，图表使用真实本地数据。</p></div>
-          <div className={`connection ${error ? 'error' : ''}`}><span />{error ? '读取失败' : loading ? '正在读取' : 'SaltCore Ready'}</div>
+    if (!productId) return;
+    const controller = new AbortController(); setContracts([]); setLoadingContracts(true); setError('');
+    api.contracts(productId, controller.signal).then((data) => setContracts(data.contracts)).catch((e) => { if (!controller.signal.aborted) setError(String(e)); }).finally(() => { if (!controller.signal.aborted) setLoadingContracts(false); });
+    return () => controller.abort();
+  }, [productId]);
+  const product = universe?.exchanges.flatMap((e) => e.products).find((p) => p.id === productId);
+  const toggle = (contract?: string) => {
+    if (!product) return;
+    const value = { product, contract }, key = keyOf(value);
+    setSelected((old) => old.some((s) => keyOf(s) === key) ? old.filter((s) => keyOf(s) !== key) : [...old, value]);
+  };
+  return <div className="market-workspace">
+    <header className="market-selector">
+      <span className="kicker">MARKET DATA</span>
+      <select aria-label={t('品种', 'Product')} value={productId} onChange={(e) => setProductId(e.target.value)}>{universe?.exchanges.map((exchange) => <optgroup label={exchange.id} key={exchange.id}>{exchange.products.map((p) => <option key={p.id} value={p.id}>{p.code} · {t(p.name, p.code)}</option>)}</optgroup>)}</select>
+      <details className="contract-picker"><summary>{t('主连 / 合约多选', 'Continuous / contracts')} <span>⌄</span></summary>
+        <div className="contract-options">
+          {[{ contract: undefined, start: '', end: '' }, ...contracts].map((item) => <label key={item.contract ?? 'MAIN'}><input type="checkbox" checked={selected.some((s) => s.product.id === productId && s.contract === item.contract)} onChange={() => toggle(item.contract)}/><b>{item.contract ?? t('品种主连', 'Continuous contract')}</b>{item.start && <small>{item.start.slice(0, 10)} — {item.end.slice(0, 10)}</small>}</label>)}
+          {loadingContracts && <small>{t('正在读取可用合约…', 'Loading available contracts…')}</small>}
         </div>
-
-        <form className="query-bar" onSubmit={submit}>
-          <label><span>频率</span><select value={frequency} onChange={(event) => changeFrequency(event.target.value as '1min' | 'daily')}><option value="daily">Daily</option><option value="1min">1 minute</option></select></label>
-          <label><span>读取对象</span><select value={mode} onChange={(event) => setMode(event.target.value as 'product' | 'contract')}><option value="product">品种主连</option><option value="contract">具体合约</option></select></label>
-          {mode === 'contract' && <label className="contract-input"><span>合约代码</span><input value={contract} onChange={(event) => setContract(event.target.value.toUpperCase())} placeholder={`${product?.code ?? 'AU'}2612`} required /></label>}
-          <label><span>开始</span><input type="date" value={range.start} onChange={(event) => setRange({ ...range, start: event.target.value })} /></label>
-          <label><span>结束</span><input type="date" value={range.end} onChange={(event) => setRange({ ...range, end: event.target.value })} /></label>
-          <button className="primary" disabled={!product || loading}>{loading ? 'LOADING' : 'RUN QUERY'}</button>
-        </form>
-
-        {error && <div className="error-banner">{error}</div>}
-
-        <div className="metric-row">
-          <div className="metric"><span>RETURNED BARS</span><strong>{result?.returned.toLocaleString() ?? '—'}</strong><small>{result?.truncated ? `共 ${result.row_count.toLocaleString()} 行，显示尾部` : '当前查询范围'}</small></div>
-          <div className="metric"><span>LAST CLOSE</span><strong>{number(summary.last?.close)}</strong><small>{summary.last?.ts.slice(0, 10) ?? '等待查询'}</small></div>
-          <div className={`metric ${summary.change != null && summary.change < 0 ? 'negative' : ''}`}><span>RANGE CHANGE</span><strong>{summary.change == null ? '—' : `${summary.change >= 0 ? '+' : ''}${summary.change.toFixed(2)}%`}</strong><small>按返回区间首尾收盘</small></div>
-          <div className="metric"><span>CONTRACTS</span><strong>{result ? summary.contracts || '—' : '—'}</strong><small>{result?.contract ?? '主连行内身份'}</small></div>
-        </div>
-
-        <div className="panel chart-panel">
-          <div className="panel-heading"><div><span className="kicker">PRICE / VOLUME</span><h2>{result ? `${result.product.id} · ${result.freq}` : '等待行情'}</h2></div><span className="muted">最多绘制末尾 240 根 · 点击 K 线检查</span></div>
-          <OhlcChart bars={result?.rows ?? []} selected={selected} onSelect={setSelected} />
-        </div>
-
-        <div className="lower-grid">
-          <div className="panel inspector">
-            <div className="panel-heading"><div><span className="kicker">BAR INSPECTOR</span><h2>{selected?.ts.replace('T', ' ').slice(0, 19) ?? '选择一根 K 线'}</h2></div><span className="contract-chip">{selected?.contract ?? 'MAIN'}</span></div>
-            <dl>
-              <div><dt>OPEN</dt><dd>{number(selected?.open)}</dd></div><div><dt>HIGH</dt><dd>{number(selected?.high)}</dd></div>
-              <div><dt>LOW</dt><dd>{number(selected?.low)}</dd></div><div><dt>CLOSE</dt><dd>{number(selected?.close)}</dd></div>
-              <div><dt>VOLUME</dt><dd>{number(selected?.volume, 0)}</dd></div><div><dt>OPEN INTEREST</dt><dd>{number(selected?.open_interest, 0)}</dd></div>
-              <div><dt>AMOUNT</dt><dd>{number(selected?.amount, 0)}</dd></div><div><dt>PRODUCT</dt><dd>{selected?.product_id ?? '—'}</dd></div>
-            </dl>
-          </div>
-          <div className="panel boundary-card"><span className="kicker">CURRENT BOUNDARY</span><h2>第一版只做读取与证明</h2><ul><li><b>真实数据</b><span>DuckDB 读取现有 Parquet</span></li><li><b>统一入口</b><span>Recipe 只调用 SaltCore</span></li><li><b>研究执行</b><span>本页面不计算 Factor 或回测</span></li></ul></div>
-        </div>
-      </section>
-    </div>
-  );
+      </details>
+      <span className="subtle">{t('全部历史 · 点击日线进入分钟', 'Full history · Click a daily bar for minutes')}</span>
+    </header>
+    {error && <div className="error-banner">{error}</div>}
+      <div className="selected-contracts">{selected.map((s) => <button key={keyOf(s)} onClick={() => setSelected((old) => old.filter((v) => keyOf(v) !== keyOf(s)))}>{s.contract ?? `${s.product.code} ${t('主连', 'Continuous')}`} ×</button>)}</div>
+    {!!selected.length && <div className="market-charts panel" aria-label={t('已选行情对比面板', 'Selected market comparison panel')}>{selected.map((s) => <MarketPane key={keyOf(s)} selection={s} onRemove={() => setSelected((old) => old.filter((v) => keyOf(v) !== keyOf(s)))}/>)}</div>}
+    {!selected.length && <div className="chart-empty">{t('选择品种与合约开始浏览', 'Choose products and contracts to begin')}</div>}
+  </div>;
 }

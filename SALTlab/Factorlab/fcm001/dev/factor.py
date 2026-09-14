@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +39,7 @@ TRADE_COLUMNS = [
     "product_id",
     "contract",
     "action",
+    "reason",
     "side",
     "weight_change",
     "price",
@@ -83,7 +85,7 @@ def _daily_product_panel(
     minute_bars = minute.bars
     by_day = minute_bars.groupby("trading_date", sort=False)
     close_contract = by_day["contract"].last()
-    flat_day = by_day["flat_ohlc_day"].first()
+    flat_minute_observed = by_day["flat_ohlc"].any()
     # Only the first day segment's opening minute; a missing 09:00 bar must not fall back to 10:30.
     scheduled_open = minute_bars[
         minute_bars["segment"].eq("day-1")
@@ -95,8 +97,8 @@ def _daily_product_panel(
         instrument["day_segments"][-1][1] + ":00"
     )
     daily["contract"] = daily["trading_date"].map(close_contract)
-    daily["flat_ohlc_day"] = (
-        daily["trading_date"].map(flat_day).fillna(False).astype(bool)
+    daily["flat_minute_observed"] = (
+        daily["trading_date"].map(flat_minute_observed).fillna(False).astype(bool)
     )
     daily["execution_time"] = daily["trading_date"].map(scheduled_open["ts"])
     daily["execution_open"] = daily["trading_date"].map(scheduled_open["open"])
@@ -117,9 +119,10 @@ def _daily_product_panel(
         & daily["high"].ge(daily[["open", "close", "low"]].max(axis=1))
         & daily["low"].le(daily[["open", "close", "high"]].min(axis=1))
     )
+    daily["daily_flat_ohlc"] = daily["bar_valid"] & ohlc.nunique(axis=1).eq(1)
     daily["roll_flag"] = daily["contract"].ne(daily["contract"].shift()).fillna(True)
-    # Daily closes rank regardless of flat minutes; flat_ohlc_day is kept only for audit.
-    daily["price_valid"] = daily["bar_valid"]
+    # Flat minutes do not invalidate the completed daily close. A flat daily bar does.
+    daily["price_valid"] = daily["bar_valid"] & ~daily["daily_flat_ohlc"]
     daily["signal_base_valid"] = daily["price_valid"]
     daily["product_id"] = product_id
     columns = [
@@ -131,7 +134,8 @@ def _daily_product_panel(
         "roll_flag",
         "price_valid",
         "signal_base_valid",
-        "flat_ohlc_day",
+        "daily_flat_ohlc",
+        "flat_minute_observed",
         "execution_time",
         "execution_open",
         "execution_contract",
@@ -140,9 +144,10 @@ def _daily_product_panel(
     metadata = {
         "daily_rows": len(raw_daily),
         "daily_sha256": frame_digest(raw_daily),
+        "daily_flat_ohlc_days": int(daily["daily_flat_ohlc"].sum()),
         "minute_rows": minute.source_rows,
         "minute_sha256": minute.digest,
-        "flat_ohlc_excluded_trading_days": minute.flat_ohlc_days,
+        "flat_minute_trading_days": minute.flat_ohlc_days,
     }
     return daily[columns], metadata
 
@@ -322,6 +327,16 @@ def _fee_rate(instrument: dict, price: float, action: str) -> float:
     return float(rate) / (price * float(instrument["multiplier"]))
 
 
+def _slippage_rate(instrument: dict, price: float) -> float:
+    """Fractional-return drag from filling `slippage_ticks * tick_size` away from the
+    quoted price. Already a price-domain offset, so unlike a fixed-mode fee this needs
+    no `multiplier`: (price ± slip) / price - 1 == slip / price."""
+    slippage_ticks = float(instrument["slippage_ticks"])
+    if slippage_ticks < 0:
+        raise ValueError("slippage_ticks must be non-negative")
+    return slippage_ticks * float(instrument["tick_size"]) / price
+
+
 def _trade_amounts(old: float, new: float, contract_changed: bool) -> tuple[float, float]:
     if not contract_changed and old * new > 0:
         return max(abs(old) - abs(new), 0.0), max(abs(new) - abs(old), 0.0)
@@ -350,6 +365,7 @@ def simulate_basket(
     ]
     all_dates = list(targets.index)
     previous_date = dict(zip(all_dates[1:], all_dates[:-1], strict=True))
+    next_date = dict(pairwise(all_dates))
     current_weights = {product_id: 0.0 for product_id in products}
     current_contracts: dict[str, str] = {}
     last_prices: dict[str, float] = {}
@@ -395,6 +411,20 @@ def simulate_basket(
             if signal_date is not None
             else {product_id: 0.0 for product_id in products}
         )
+        forced_roll: set[str] = set()
+        following_date = next_date.get(trading_date)
+        if following_date is not None:
+            for product_id in products:
+                current_row = execution_rows.get(product_id)
+                following_key = (following_date, product_id)
+                if current_row is None or following_key not in lookup.index:
+                    continue
+                following_row = lookup.loc[following_key]
+                if isinstance(following_row, pd.DataFrame):
+                    raise TypeError(f"Duplicate panel row: {following_date} {product_id}")
+                if current_row["execution_contract"] != following_row["execution_contract"]:
+                    target[product_id] = 0.0
+                    forced_roll.add(product_id)
         if date_number == len(dates) - 1:
             target = {product_id: 0.0 for product_id in products}
 
@@ -437,8 +467,9 @@ def simulate_basket(
                 execution_time = pd.Timestamp(row["execution_time"])
                 if close_amount:
                     close_price = marks[product_id]
-                    cost = close_amount * _fee_rate(
-                        instrument_map[product_id], close_price, "close"
+                    cost = close_amount * (
+                        _fee_rate(instrument_map[product_id], close_price, "close")
+                        + _slippage_rate(instrument_map[product_id], close_price)
                     )
                     fees += cost
                     trades.append(
@@ -449,6 +480,13 @@ def simulate_basket(
                             "product_id": product_id,
                             "contract": old_contract,
                             "action": "close",
+                            "reason": (
+                                "terminal_close"
+                                if date_number == len(dates) - 1
+                                else "pre_main_roll"
+                                if product_id in forced_roll
+                                else "rebalance"
+                            ),
                             "side": "long" if old > 0 else "short",
                             "weight_change": close_amount,
                             "price": close_price,
@@ -457,8 +495,9 @@ def simulate_basket(
                     )
                 if open_amount:
                     open_price = float(row["execution_open"])
-                    cost = open_amount * _fee_rate(
-                        instrument_map[product_id], open_price, "open"
+                    cost = open_amount * (
+                        _fee_rate(instrument_map[product_id], open_price, "open")
+                        + _slippage_rate(instrument_map[product_id], open_price)
                     )
                     fees += cost
                     trades.append(
@@ -469,6 +508,7 @@ def simulate_basket(
                             "product_id": product_id,
                             "contract": new_contract,
                             "action": "open",
+                            "reason": "rebalance",
                             "side": "long" if new > 0 else "short",
                             "weight_change": open_amount,
                             "price": open_price,
@@ -495,6 +535,7 @@ def simulate_basket(
                 "cumulative_net_return": cumulative - 1.0,
                 "rebalance_executed": executable,
                 "skip_reason": None if executable else "basket_execution_failed",
+                "pre_main_roll_products": ",".join(sorted(forced_roll)) or None,
             }
         )
         for product_id in products:
@@ -509,7 +550,16 @@ def simulate_basket(
             )
 
     if any(not np.isclose(weight, 0.0) for weight in current_weights.values()):
-        raise RuntimeError("FCM001 terminal basket could not be closed")
+        remaining = {
+            product_id: {
+                "weight": weight,
+                "contract": current_contracts.get(product_id),
+                "last_price": last_prices.get(product_id),
+            }
+            for product_id, weight in current_weights.items()
+            if not np.isclose(weight, 0.0)
+        }
+        raise RuntimeError(f"FCM001 terminal basket could not be closed: {remaining}")
     return (
         pd.DataFrame(positions),
         pd.DataFrame(trades, columns=TRADE_COLUMNS),
@@ -535,10 +585,8 @@ def run_study(
         pd.to_datetime(ranked["trading_date"]).ge(pd.Timestamp(start))
         & pd.to_datetime(ranked["trading_date"]).lt(pd.Timestamp(end_exclusive))
     ][RANKING_COLUMNS].copy()
-    equity = pd.concat(
-        [pd.Series([0.0]), pnl["cumulative_net_return"]], ignore_index=True
-    )
-    drawdown = equity.sub(equity.cummax())
+    wealth = pnl["cumulative_net_return"].add(1.0)
+    drawdown = wealth.div(wealth.cummax()).sub(1.0)
     summary = pd.DataFrame(
         [
             {
@@ -551,7 +599,7 @@ def run_study(
                 "compounded_net_return": float(
                     pnl["cumulative_net_return"].iloc[-1] if len(pnl) else 0.0
                 ),
-                "max_drawdown": float(drawdown.min()),
+                "max_drawdown": float(drawdown.min()) if len(drawdown) else 0.0,
                 "failed_rebalances": int((~pnl["rebalance_executed"]).sum()),
             }
         ]
@@ -565,6 +613,17 @@ def run_study(
         "warmup_start": warmup_start,
         "accounting_unit": "normalized portfolio return; fractional target weights",
         "integer_contract_sizing": None,
+        "execution": {
+            "signal_time": strategy["signal_time"],
+            "execution_time": strategy["execution_time"],
+            "basket_execution": strategy["basket_execution"],
+            "pre_main_roll": "close the leg at 09:00 one trading date before the published main contract changes",
+        },
+        "limitations": [
+            "The published main-contract schedule is used to identify the trading date before a roll; its point-in-time construction is not independently verified.",
+            "A completed flat daily OHLC bar is excluded from daily features; a flat 1min bar invalidates only that execution minute.",
+            "Returns use fractional target weights and current reference costs; integer contract sizing and shared capital are not implemented.",
+        ],
         "data": data_metadata,
     }
     destination = (

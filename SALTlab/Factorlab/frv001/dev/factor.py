@@ -1,4 +1,4 @@
-"""FRV001 constructions that are specific to the daily study."""
+"""FRV001 daily-scale signal evaluated on every completed 1min bar."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from saltcore import read_bars
 
 
 @dataclass(frozen=True)
-class DailyProductData:
+class DailyHistory:
     bars: pd.DataFrame
     source_first: pd.Timestamp
     source_last: pd.Timestamp
@@ -21,15 +21,14 @@ class DailyProductData:
     digest: str
 
 
-def load_daily_product(
+def load_daily_history(
     product_id: str,
-    instrument: dict,
     minute_data: ProductData,
     warmup_start: str,
     end_exclusive: str,
     root: str | Path | None = None,
-) -> DailyProductData:
-    """Read published daily bars and attach point-in-time contracts from the 1min main series."""
+) -> DailyHistory:
+    """Read completed daily bars and attach the closing main-contract id."""
     end = pd.Timestamp(end_exclusive) - pd.Timedelta(microseconds=1)
     raw = read_bars(
         product=product_id,
@@ -43,17 +42,13 @@ def load_daily_product(
 
     bars = raw.copy().sort_values("ts").reset_index(drop=True)
     bars["trading_date"] = pd.to_datetime(bars["ts"]).dt.strftime("%Y-%m-%d")
-    day = pd.to_datetime(bars["trading_date"])
-    close_time = pd.to_timedelta(instrument["day_segments"][-1][1] + ":00")
-    open_time = pd.to_timedelta(instrument["day_segments"][0][0] + ":00")
-    bars["ts"] = day + close_time
-    bars["open_time"] = day + open_time
+    if bars["trading_date"].duplicated().any():
+        raise ValueError(f"Duplicate daily trading_date for {product_id}")
 
-    minute_bars = minute_data.bars
-    contract_by_day = minute_bars.groupby("trading_date", sort=False)["contract"].first()
-    bars["contract"] = bars["trading_date"].map(contract_by_day)
-    excluded_days = set(minute_bars.loc[minute_bars["flat_ohlc_day"], "trading_date"])
-
+    closing_contract = minute_data.bars.groupby("trading_date", sort=False)[
+        "contract"
+    ].last()
+    bars["contract"] = bars["trading_date"].map(closing_contract)
     ohlc = bars[["open", "high", "low", "close"]]
     finite = np.isfinite(ohlc).all(axis=1)
     bars["bar_valid"] = (
@@ -64,12 +59,9 @@ def load_daily_product(
         & bars["high"].ge(bars[["open", "close", "low"]].max(axis=1))
         & bars["low"].le(bars[["open", "close", "high"]].min(axis=1))
     )
-    bars["roll_flag"] = bars["contract"].ne(bars["contract"].shift()).fillna(True)
-    bars["flat_ohlc_day"] = bars["trading_date"].isin(excluded_days)
-    bars["valid"] = bars["bar_valid"] & ~bars["roll_flag"] & ~bars["flat_ohlc_day"]
-    bars["tradable"] = bars["valid"]
-    bars = bars.set_index("ts", drop=False)
-    return DailyProductData(
+    bars["daily_flat_ohlc"] = bars["bar_valid"] & ohlc.nunique(axis=1).eq(1)
+    bars["valid"] = bars["bar_valid"] & ~bars["daily_flat_ohlc"]
+    return DailyHistory(
         bars=bars,
         source_first=pd.Timestamp(raw["ts"].min()),
         source_last=pd.Timestamp(raw["ts"].max()),
@@ -78,34 +70,60 @@ def load_daily_product(
     )
 
 
-def daily_reversal(frame: pd.DataFrame, strategy: dict) -> pd.DataFrame:
-    """Build the fixed five-day, lagged-volatility reversal signal."""
-    n = strategy["lookback_bars"]
-    log_close = frame["close"].where(frame["valid"]).map(np.log)
-    same_contract = frame["contract"].eq(frame["contract"].shift())
-    returns = log_close.diff().where(
-        same_contract & frame["valid"] & frame["valid"].shift(fill_value=False)
-    )
-    observed = returns.dropna()
-    volatility = observed.rolling(
-        strategy["volatility_lookback"],
-        min_periods=strategy["volatility_lookback"],
-    ).std(ddof=1).shift(1).reindex(frame.index).ffill()
+def daily_scale_displacement(
+    minute_bars: pd.DataFrame,
+    daily_bars: pd.DataFrame,
+    strategy: dict,
+) -> pd.DataFrame:
+    """Compare each minute close with the close n trading dates earlier.
 
-    group = frame["contract"].fillna("")
-    lagged = log_close.groupby(group, sort=False).shift(n)
-    complete = (
-        frame["valid"]
-        .groupby(group, sort=False)
-        .rolling(n + 1, min_periods=n + 1)
-        .sum()
-        .reset_index(level=0, drop=True)
-        .eq(n + 1)
+    The scale for trading date D uses only completed daily returns strictly
+    before D. A flat current minute is already invalid in ``minute_bars``; a
+    completed flat daily bar is excluded from anchors and volatility history.
+    """
+    n = int(strategy["lookback_days"])
+    m = int(strategy["volatility_lookback_days"])
+    daily = daily_bars.copy().sort_values("trading_date").reset_index(drop=True)
+    log_daily_close = daily["close"].where(daily["valid"]).map(np.log)
+    same_contract = daily["contract"].eq(daily["contract"].shift())
+    daily_return = log_daily_close.diff().where(
+        same_contract & daily["valid"] & daily["valid"].shift(fill_value=False)
     )
+
+    observed = daily_return.dropna()
+    lagged_volatility = (
+        observed.rolling(m, min_periods=m)
+        .std(ddof=1)
+        .shift(1)
+        .reindex(daily.index)
+        .ffill()
+    )
+    reference = pd.DataFrame(
+        {
+            "trading_date": daily["trading_date"],
+            "anchor_log_close": log_daily_close.shift(n),
+            "anchor_contract": daily["contract"].shift(n),
+            "anchor_valid": daily["valid"].shift(n, fill_value=False),
+            "daily_volatility": lagged_volatility,
+        }
+    ).set_index("trading_date")
+
+    dates = minute_bars["trading_date"]
+    anchor = dates.map(reference["anchor_log_close"])
+    anchor_contract = dates.map(reference["anchor_contract"])
+    anchor_valid = dates.map(reference["anchor_valid"]).fillna(False).astype(bool)
+    volatility = dates.map(reference["daily_volatility"])
     scale = volatility.mul(np.sqrt(n))
-    value = log_close.sub(lagged).mul(strategy["signal_sign"]).div(scale)
+    log_current = minute_bars["close"].where(minute_bars["valid"]).map(np.log)
+    value = log_current.sub(anchor).mul(float(strategy["signal_sign"])).div(scale)
     finite_value = value.replace([np.inf, -np.inf], np.nan).notna()
-    valid = complete & frame["valid"] & scale.gt(0) & finite_value
+    valid = (
+        minute_bars["valid"]
+        & anchor_valid
+        & minute_bars["contract"].eq(anchor_contract)
+        & scale.gt(0)
+        & finite_value
+    )
     return pd.DataFrame(
         {
             "value": value.where(valid),
@@ -113,5 +131,5 @@ def daily_reversal(frame: pd.DataFrame, strategy: dict) -> pd.DataFrame:
             "range_high": np.nan,
             "range_low": np.nan,
         },
-        index=frame.index,
+        index=minute_bars.index,
     )

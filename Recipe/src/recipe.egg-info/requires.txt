@@ -1,4 +1,0 @@
-fastapi<1,>=0.115
-pandas>=2.2
-saltcore
-uvicorn<1,>=0.34

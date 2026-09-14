@@ -28,13 +28,15 @@ def _bars(count: int = 8) -> pd.DataFrame:
     return frame
 
 
-def _instrument() -> dict:
+def _instrument(*, tick_size: float = 1.0, slippage_ticks: float = 0.0) -> dict:
     return {
         "multiplier": 10,
         "fee_mode": "fixed",
         "open_fee": 2,
         "close_fee": 2,
         "close_today_fee": 1,
+        "tick_size": tick_size,
+        "slippage_ticks": slippage_ticks,
     }
 
 
@@ -181,7 +183,7 @@ def test_warmup_starts_at_the_requested_trading_day_open() -> None:
     assert calendar.session_start("2026-01-05", day_only) == pd.Timestamp("2026-01-05 09:30")
 
 
-def test_one_flat_ohlc_bar_excludes_its_whole_trading_day() -> None:
+def test_one_flat_ohlc_bar_excludes_only_that_minute() -> None:
     calendar = object.__new__(TradingCalendar)
     calendar.days = [date(2026, 1, 5)]
     calendar.day_set = set(calendar.days)
@@ -201,5 +203,126 @@ def test_one_flat_ohlc_bar_excludes_its_whole_trading_day() -> None:
     assert outside == 0
     assert annotated["bar_valid"].all()
     assert annotated["flat_ohlc_day"].all()
-    assert not annotated["valid"].any()
-    assert not annotated["tradable"].any()
+    assert annotated["valid"].tolist() == [True, False, True]
+    assert annotated["tradable"].tolist() == [True, False, True]
+
+
+def test_slippage_ticks_worsen_every_fill_by_side() -> None:
+    """Buying (long entry) fills above the open by slip; selling to close it (long exit)
+    fills below the reference price by the same slip — matching the fixed formula
+    price = open ± slippage_ticks * tick_size, worse against the position either way."""
+    bars = _bars(4)
+    bars.loc[bars.index[-1], ["is_session_last_bar", "is_trading_day_last_bar"]] = True
+    bars["minutes_to_session_end"] = [4, 3, 2, 1]
+    bars["minutes_to_trading_day_end"] = [4, 3, 2, 1]
+    signal = pd.DataFrame(
+        {
+            "value": [3.0, -1.0, -1.0, -1.0],
+            "signal_valid": True,
+            "range_high": float("nan"),
+            "range_low": float("nan"),
+        },
+        index=bars.index,
+    )
+    strategy = {
+        "strategy_id": "TEST",
+        "factor_id": "TEST",
+        "implementation": "rolling_displacement",
+        "entry_threshold": 2.0,
+        "exit_threshold": 0.0,
+        "holding_scope": "session",
+    }
+    execution = {"force_flat_minutes_before_scope_end": 1}
+    instrument = _instrument(tick_size=0.5, slippage_ticks=2.0)
+    result = simulate("SHFE.RB", bars, signal, strategy, execution, instrument, "2026-01-05", "2026-01-06")
+    trade = result.trades.iloc[0]
+    # entry at bars.index[1], open=101, long (side=+1): filled 1 tick*2 = 1.0 above quote.
+    assert trade.entry_price == 101 + 1.0
+    # exit at bars.index[2], open=102, closing a long: filled 1.0 below quote.
+    assert trade.exit_price == 102 - 1.0
+    assert trade.gross_pnl == (trade.exit_price - trade.entry_price) * 10
+
+
+def test_execution_delay_bars_pushes_the_fill_out_without_a_retry_window() -> None:
+    """execution_delay_bars=0 (the current default) keeps filling at the very next bar;
+    a positive value fills `delay_bars` bars further out, still fill-or-kill at exactly
+    that one bar rather than opening a retry window."""
+    bars = _bars(5)
+    bars.loc[bars.index[-1], ["is_session_last_bar", "is_trading_day_last_bar"]] = True
+    bars["minutes_to_session_end"] = [5, 4, 3, 2, 1]
+    bars["minutes_to_trading_day_end"] = [5, 4, 3, 2, 1]
+    signal = pd.DataFrame(
+        {
+            "value": [3.0, 0.0, 0.0, -1.0, -1.0],
+            "signal_valid": True,
+            "range_high": float("nan"),
+            "range_low": float("nan"),
+        },
+        index=bars.index,
+    )
+    strategy = {
+        "strategy_id": "TEST",
+        "factor_id": "TEST",
+        "implementation": "rolling_displacement",
+        "entry_threshold": 2.0,
+        "exit_threshold": 0.0,
+        "holding_scope": "session",
+    }
+    execution = {"force_flat_minutes_before_scope_end": 1, "execution_delay_bars": 1}
+    result = simulate("SHFE.RB", bars, signal, strategy, execution, _instrument(), "2026-01-05", "2026-01-06")
+    trade = result.trades.iloc[0]
+    assert trade.entry_signal_time == bars.index[0]
+    assert trade.entry_time == bars.index[2]
+    assert trade.entry_price == 102
+    assert trade.exit_signal_time == bars.index[3]
+    assert trade.exit_time == bars.index[4]
+
+
+def test_cross_day_position_closes_before_contract_expiry() -> None:
+    class Quotes:
+        def __call__(self, contract: str, timestamp: pd.Timestamp):
+            return None
+
+        def last_trading_date(self, contract: str) -> str:
+            return "2026-01-06"
+
+    index = pd.DatetimeIndex(
+        ["2026-01-05 14:54", "2026-01-05 14:55", "2026-01-06 14:54", "2026-01-06 14:55"]
+    )
+    bars = _bars(len(index))
+    bars.index = index
+    bars["ts"] = index
+    bars["trading_date"] = ["2026-01-05", "2026-01-05", "2026-01-06", "2026-01-06"]
+    bars["minutes_to_trading_day_end"] = [6, 5, 6, 5]
+    signals = pd.DataFrame(
+        {
+            "value": [3.0] * 4,
+            "signal_valid": True,
+            "range_high": float("nan"),
+            "range_low": float("nan"),
+        },
+        index=index,
+    )
+    strategy = {
+        "strategy_id": "DAILY_SCALE",
+        "factor_id": "FRV001",
+        "implementation": "daily_scale_displacement",
+        "entry_threshold": 2.0,
+        "exit_threshold": 0.0,
+        "holding_scope": "research_period",
+    }
+    result = simulate(
+        "SHFE.RB",
+        bars,
+        signals,
+        strategy,
+        {"force_flat_minutes_before_scope_end": 5},
+        _instrument(),
+        "2026-01-05",
+        "2026-01-07",
+        Quotes(),
+    )
+    trade = result.trades.iloc[0]
+    assert trade.exit_time == pd.Timestamp("2026-01-06 14:55")
+    assert trade.exit_reason == "contract_last_trading_day"
+    assert result.final_open_position is None

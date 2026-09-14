@@ -1,28 +1,39 @@
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
-from frv001.dev.factor import daily_reversal
+from frv001.dev.factor import daily_scale_displacement
 from infra.backtest import simulate
 
 
-def test_five_bar_horizon_is_derived_from_n() -> None:
-    index = pd.date_range("2026-01-05 09:00", periods=8, freq="min")
+def _bars(index: pd.DatetimeIndex, trading_dates: list[str]) -> pd.DataFrame:
     bars = pd.DataFrame(index=index)
     bars["ts"] = index
-    bars[["open", "high", "low", "close"]] = [[100, 101, 99, 100]] * 8
+    bars[["open", "high", "low", "close"]] = [[100, 101, 99, 100]] * len(index)
     bars["volume"] = 10
     bars["contract"] = "RB2605"
-    bars["trading_date"] = "2026-01-05"
+    bars["trading_date"] = trading_dates
     bars["session_name"] = "day"
-    bars["session"] = "2026-01-05:day"
+    bars["session"] = bars["trading_date"] + ":day"
     bars["valid"] = True
     bars["tradable"] = True
     bars["is_session_last_bar"] = False
     bars["is_trading_day_last_bar"] = False
-    bars["minutes_to_session_end"] = [8, 7, 6, 5, 4, 3, 2, 1]
-    bars["minutes_to_trading_day_end"] = bars["minutes_to_session_end"]
+    bars["minutes_to_session_end"] = 100
+    bars["minutes_to_trading_day_end"] = 100
+    return bars
+
+
+def test_five_bar_horizon_is_derived_from_n() -> None:
+    index = pd.date_range("2026-01-05 09:00", periods=8, freq="min")
+    bars = _bars(index, ["2026-01-05"] * len(index))
     signals = pd.DataFrame(
-        {"value": [3.0] * 8, "signal_valid": True, "range_high": float("nan"), "range_low": float("nan")},
+        {
+            "value": [3.0] * 8,
+            "signal_valid": True,
+            "range_high": np.nan,
+            "range_low": np.nan,
+        },
         index=index,
     )
     strategy = {
@@ -35,57 +46,98 @@ def test_five_bar_horizon_is_derived_from_n() -> None:
         "exit_threshold": 0.0,
         "holding_scope": "session",
     }
-    instrument = {"multiplier": 10, "fee_mode": "fixed", "open_fee": 0, "close_fee": 0, "close_today_fee": 0}
-    execution = {"force_flat_minutes_before_scope_end": 1}
-    result = simulate("SHFE.RB", bars, signals, strategy, execution, instrument, "2026-01-05", "2026-01-06")
+    instrument = {
+        "multiplier": 10,
+        "fee_mode": "fixed",
+        "open_fee": 0,
+        "close_fee": 0,
+        "close_today_fee": 0,
+        "tick_size": 1.0,
+        "slippage_ticks": 0.0,
+    }
+    result = simulate(
+        "SHFE.RB",
+        bars,
+        signals,
+        strategy,
+        {"force_flat_minutes_before_scope_end": 1},
+        instrument,
+        "2026-01-05",
+        "2026-01-06",
+    )
     assert result.trades.iloc[0].bars_held == 5
     assert result.trades.iloc[0].exit_reason == "derived_horizon"
 
 
-def test_daily_reversal_resets_its_displacement_after_roll() -> None:
-    index = pd.date_range("2026-01-01 15:00", periods=12, freq="D")
-    frame = pd.DataFrame(index=index)
-    frame["close"] = [100, 101, 100, 102, 101, 99, 98, 100, 101, 99, 98, 97]
-    frame["contract"] = ["RB2605"] * 8 + ["RB2610"] * 4
-    frame["valid"] = True
-    frame.loc[index[8], "valid"] = False
+def test_daily_scale_signal_uses_lagged_daily_inputs_on_each_minute() -> None:
+    daily = pd.DataFrame(
+        {
+            "trading_date": pd.date_range("2026-01-05", periods=6, freq="B").strftime("%Y-%m-%d"),
+            "close": [100.0, 101.0, 103.0, 104.0, 105.0, 106.0],
+            "contract": "RB2605",
+            "valid": True,
+        }
+    )
+    index = pd.date_range("2026-01-08 09:00", periods=3, freq="min")
+    minute = _bars(index, ["2026-01-08"] * 3)
+    minute["close"] = [106.0, 107.0, 108.0]
+    minute.loc[index[1], "valid"] = False
     strategy = {
-        "lookback_bars": 2,
-        "volatility_lookback": 3,
+        "lookback_days": 2,
+        "volatility_lookback_days": 2,
         "signal_sign": -1,
     }
-    signal = daily_reversal(frame, strategy)
-    assert not signal.loc[index[8:11], "signal_valid"].any()
-    assert signal.loc[index[11], "signal_valid"]
+    signal = daily_scale_displacement(minute, daily, strategy)
+    sigma = np.std([np.log(101 / 100), np.log(103 / 101)], ddof=1)
+    expected = -np.log(106 / 101) / (sigma * np.sqrt(2))
+    assert np.isclose(signal.loc[index[0], "value"], expected)
+    assert not signal.loc[index[1], "signal_valid"]
+    assert signal.loc[index[2], "signal_valid"]
 
 
-def test_daily_trade_uses_next_day_open_time() -> None:
-    index = pd.date_range("2026-01-05 15:00", periods=8, freq="D")
-    bars = pd.DataFrame(index=index)
-    bars["ts"] = index
-    bars["open_time"] = index.normalize() + pd.Timedelta(hours=9)
-    bars[["open", "high", "low", "close"]] = [[100, 101, 99, 100]] * 8
-    bars["volume"] = 10
-    bars["contract"] = "RB2605"
-    bars["trading_date"] = index.strftime("%Y-%m-%d")
-    bars["valid"] = True
-    bars["tradable"] = True
+def test_daily_scale_signal_waits_until_anchor_contract_matches() -> None:
+    daily = pd.DataFrame(
+        {
+            "trading_date": pd.date_range("2026-01-05", periods=6, freq="B").strftime("%Y-%m-%d"),
+            "close": [100.0, 101.0, 103.0, 104.0, 105.0, 106.0],
+            "contract": ["RB2601", "RB2601", "RB2601", "RB2605", "RB2605", "RB2605"],
+            "valid": True,
+        }
+    )
+    index = pd.DatetimeIndex(["2026-01-08 09:00"])
+    minute = _bars(index, ["2026-01-08"])
+    strategy = {
+        "lookback_days": 2,
+        "volatility_lookback_days": 2,
+        "signal_sign": -1,
+    }
+    signal = daily_scale_displacement(minute, daily, strategy)
+    assert not signal.iloc[0]["signal_valid"]
+
+
+def test_daily_scale_position_exits_after_five_trading_days() -> None:
+    days = pd.date_range("2026-01-05", periods=6, freq="B")
+    index = pd.DatetimeIndex(
+        [day + pd.Timedelta(hours=9, minutes=minute) for day in days for minute in range(2)]
+    )
+    trading_dates = [str(day.date()) for day in days for _ in range(2)]
+    bars = _bars(index, trading_dates)
     signals = pd.DataFrame(
         {
-            "value": [3.0] * 8,
+            "value": 3.0,
             "signal_valid": True,
-            "range_high": float("nan"),
-            "range_low": float("nan"),
+            "range_high": np.nan,
+            "range_low": np.nan,
         },
         index=index,
     )
     strategy = {
-        "strategy_id": "FRV_DAILY",
+        "strategy_id": "FRV_DAILY_SCALE",
         "factor_id": "FRV001",
-        "implementation": "daily_reversal",
-        "lookback_bars": 5,
-        "derived_holding_bars": "lookback_bars",
-        "entry_threshold": 2.75,
+        "implementation": "daily_scale_displacement",
+        "lookback_days": 5,
+        "derived_holding_trading_days": "lookback_days",
+        "entry_threshold": 2.0,
         "exit_threshold": 0.0,
         "holding_scope": "research_period",
     }
@@ -95,6 +147,8 @@ def test_daily_trade_uses_next_day_open_time() -> None:
         "open_fee": 0,
         "close_fee": 0,
         "close_today_fee": 0,
+        "tick_size": 1.0,
+        "slippage_ticks": 0.0,
     }
     result = simulate(
         "SHFE.RB",
@@ -107,62 +161,6 @@ def test_daily_trade_uses_next_day_open_time() -> None:
         "2026-01-13",
     )
     trade = result.trades.iloc[0]
-    assert trade.entry_time == pd.Timestamp("2026-01-06 09:00")
-    assert trade.exit_time == pd.Timestamp("2026-01-11 09:00")
-    assert trade.exit_reason == "derived_horizon"
-
-
-def test_invalid_daily_bar_does_not_consume_holding_horizon() -> None:
-    index = pd.date_range("2026-01-05 15:00", periods=9, freq="D")
-    bars = pd.DataFrame(index=index)
-    bars["ts"] = index
-    bars["open_time"] = index.normalize() + pd.Timedelta(hours=9)
-    bars[["open", "high", "low", "close"]] = [[100, 101, 99, 100]] * 9
-    bars["volume"] = 10
-    bars["contract"] = "RB2605"
-    bars["trading_date"] = index.strftime("%Y-%m-%d")
-    bars["valid"] = True
-    bars["tradable"] = True
-    bars["flat_ohlc_day"] = False
-    bars.loc[index[3], ["valid", "tradable", "flat_ohlc_day"]] = [False, False, True]
-    signals = pd.DataFrame(
-        {
-            "value": [3.0] * 9,
-            "signal_valid": True,
-            "range_high": float("nan"),
-            "range_low": float("nan"),
-        },
-        index=index,
-    )
-    signals.loc[index[3], "signal_valid"] = False
-    strategy = {
-        "strategy_id": "FRV_DAILY",
-        "factor_id": "FRV001",
-        "implementation": "daily_reversal",
-        "lookback_bars": 5,
-        "derived_holding_bars": "lookback_bars",
-        "entry_threshold": 2.75,
-        "exit_threshold": 0.0,
-        "holding_scope": "research_period",
-    }
-    instrument = {
-        "multiplier": 10,
-        "fee_mode": "fixed",
-        "open_fee": 0,
-        "close_fee": 0,
-        "close_today_fee": 0,
-    }
-    result = simulate(
-        "SHFE.RB",
-        bars,
-        signals,
-        strategy,
-        {"force_flat_minutes_before_scope_end": 5},
-        instrument,
-        "2026-01-05",
-        "2026-01-14",
-    )
-    trade = result.trades.iloc[0]
-    assert trade.bars_held == 5
-    assert trade.exit_time == pd.Timestamp("2026-01-12 09:00")
-    assert trade.exit_reason == "derived_horizon"
+    assert trade.trading_days_held == 5
+    assert trade.exit_time == pd.Timestamp("2026-01-09 09:01")
+    assert trade.exit_reason == "derived_daily_horizon"

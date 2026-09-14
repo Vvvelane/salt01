@@ -1,38 +1,34 @@
 import { useState } from 'react';
-import { Cards } from './views/Cards';
 import { Factors } from './views/Factors';
-import { Market } from './views/Market';
+import { Database } from './views/Database';
 import { Tree } from './views/Tree';
+import { useLanguage } from './i18n';
 
-type Page = 'market' | 'tree' | 'cards' | 'factors';
+type Page = 'database' | 'tree' | 'factors';
 
 export function App() {
-  const [page, setPage] = useState<Page>('market');
-  const [focusCard, setFocusCard] = useState<string | null>(null);
-  function openCard(factorId: string) {
-    setFocusCard(factorId);
-    setPage('cards');
-  }
+  const { language, toggleLanguage, t } = useLanguage();
+  const [page, setPage] = useState<Page>('database');
+  const [resultStrategy, setResultStrategy] = useState<string>();
+  const openResults = (strategy?: string) => { setResultStrategy(strategy); setPage('factors'); };
   return (
     <div className="app-shell">
       <header className="topbar">
-        <button className="brand" onClick={() => setPage('market')}>
+        <button className="brand" onClick={() => setPage('database')}>
           <span className="brand-mark">S</span>
           <span><b>SALT</b><small>RESEARCH TERMINAL</small></span>
         </button>
-        <nav aria-label="主导航">
-          <button className={page === 'market' ? 'active' : ''} onClick={() => setPage('market')}>Market Data</button>
-          <button className={page === 'tree' ? 'active' : ''} onClick={() => setPage('tree')}>Factor Tree</button>
-          <button className={page === 'cards' ? 'active' : ''} onClick={() => setPage('cards')}>NaCl Registry</button>
-          <button className={page === 'factors' ? 'active' : ''} onClick={() => setPage('factors')}>Factor Results</button>
+        <nav aria-label={t('主导航')}>
+          <button className={page === 'database' ? 'active' : ''} onClick={() => setPage('database')}>{t('数据档案库', 'Database Management')}</button>
+          <button className={page === 'tree' ? 'active' : ''} onClick={() => setPage('tree')}>{t('因子树', 'Factor Tree')}</button>
+          <button className={page === 'factors' ? 'active' : ''} onClick={() => openResults()}>{t('因子结果', 'Factor Results')}</button>
         </nav>
-        <div className="phase-badge"><span /> Phase 1 · Local</div>
+        <div className="topbar-actions"><div className="phase-badge"><span /> Phase 1 · Local</div><button className="language-toggle" onClick={toggleLanguage} aria-label={language === 'en' ? 'Switch to normal mode' : '切换为全英文'} aria-pressed={language === 'en'}>{language === 'en' ? 'Normal mode' : 'English'}</button></div>
       </header>
       <main>
-        {page === 'market' && <Market />}
-        {page === 'tree' && <Tree onOpenCard={openCard} />}
-        {page === 'cards' && <Cards focusId={focusCard} />}
-        {page === 'factors' && <Factors />}
+        {page === 'database' && <Database />}
+        {page === 'tree' && <Tree onResults={openResults} />}
+        {page === 'factors' && <Factors key={resultStrategy ?? "collection"} initialStrategy={resultStrategy} />}
       </main>
     </div>
   );

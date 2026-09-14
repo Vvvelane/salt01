@@ -3,12 +3,21 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from fcm001.dev.factor import (
+    _slippage_rate,
     buffered_targets,
     construct_scores,
     g_thresholds,
     rank_scores,
     simulate_basket,
 )
+
+
+def test_slippage_rate_matches_the_fixed_tick_size_formula() -> None:
+    # 5000 buy, tick_size 0.2, 2 slippage ticks -> filled at 5000 + 0.2*2 = 5000.4;
+    # as a fractional cost against a fixed 100 lots-worth of exposure, unrelated to
+    # any currency multiplier since it is already a price-domain offset.
+    instrument = {"slippage_ticks": 2.0, "tick_size": 0.2}
+    assert np.isclose(_slippage_rate(instrument, 5000.0), 0.4 / 5000.0)
 
 
 def _strategy() -> dict:
@@ -128,7 +137,7 @@ def test_basket_enters_on_next_open_and_finishes_flat() -> None:
     assert pnl.iloc[-1]["rebalance_executed"]
 
 
-def test_momentum_skips_roll_spread_and_ignores_flat_minute_days() -> None:
+def test_momentum_skips_roll_spread_and_ignores_flat_minutes() -> None:
     closes = [100.0, 101.0, 102.0, 110.0, 111.0]
     contracts = ["X01", "X01", "X01", "X02", "X02"]
     frame = pd.DataFrame(
@@ -140,7 +149,7 @@ def test_momentum_skips_roll_spread_and_ignores_flat_minute_days() -> None:
             "roll_flag": [True, False, False, True, False],
             "price_valid": True,
             "signal_base_valid": True,
-            "flat_ohlc_day": [False, False, True, False, False],
+            "flat_minute_observed": [False, False, True, False, False],
         }
     )
     strategy = {
@@ -154,3 +163,26 @@ def test_momentum_skips_roll_spread_and_ignores_flat_minute_days() -> None:
     expected = np.log(102.0 / 101.0) + np.log(111.0 / 110.0)
     assert np.isclose(scored.loc["2026-01-09", "momentum_raw"], expected)
     assert scored.loc["2026-01-09", "signal_valid"]
+
+
+def test_flat_daily_bar_breaks_the_momentum_window() -> None:
+    frame = pd.DataFrame(
+        {
+            "trading_date": [f"2026-01-0{day}" for day in range(5, 10)],
+            "product_id": "A",
+            "close": [100.0, 101.0, 101.0, 102.0, 103.0],
+            "contract": "X01",
+            "roll_flag": [True, False, False, False, False],
+            "price_valid": [True, True, False, True, True],
+            "signal_base_valid": [True, True, False, True, True],
+        }
+    )
+    strategy = {
+        **_strategy(),
+        "products": ["A"],
+        "minimum_universe": 1,
+        "lookback_days": 2,
+        "volatility_lookback_days": 2,
+    }
+    scored = construct_scores(frame, strategy)
+    assert not scored["signal_valid"].any()

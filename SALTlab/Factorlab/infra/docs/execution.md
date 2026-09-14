@@ -1,8 +1,12 @@
 # 04 — Execution
 
-当前只有 `signal_close_next_bar_open`。数量固定一手，滑点固定 0 tick，费用按品种配置逐边扣除。
-不加仓，不在一次信号事件中反手。主力连续数据里的 `contract` 必须与信号来源一致；若持仓期间
-合约已经改变，程序不能用新合约价格假装平掉旧合约。
+当前只有 `signal_close_next_bar_open`，在此基础上由 `execution_delay_bars`（默认 0）决定再多等
+几根 bar 才尝试成交；无论 delay 是多少，都只在恰好那一根 bar 尝试一次，不是排队重试。数量固定
+一手，费用按品种配置逐边扣除。滑点不再是固定 0，改为按品种从 `config/instruments.json` 的
+`slippage_ticks * tick_size` 读取，方向永远不利于持仓方（入场买贵/卖便宜，出场卖便宜/买贵），
+具体数值和来源（真实表格 vs 同类品种近似）见该文件每个品种的 `slippage_source`。不加仓，不在
+一次信号事件中反手。主力连续数据里的 `contract` 必须与信号来源一致；若持仓期间合约已经改变，
+程序不能用新合约价格假装平掉旧合约。
 
 已保存的上一版十年结果曾允许尾盘锁住后等待旧合约下一次可交易 open，相关 173 笔记录保存在
 `issues/delayed-exits-v3-10y.*`。当前临时政策在回测前排除所有含平 OHLC 的 trading date，因此

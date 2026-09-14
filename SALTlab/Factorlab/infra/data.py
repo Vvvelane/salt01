@@ -10,7 +10,7 @@ import pandas as pd
 from saltcore.read import data_root
 
 from infra.calendar import TradingCalendar
-from saltcore import read_bars
+from saltcore import read_bars, read_contracts
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,20 @@ class ExactContractQuotes:
         self.root = data_root(root)
         self.freq = freq
         self.cache: dict[tuple[str, str], pd.DataFrame] = {}
+        self.last_trading_dates: dict[str, str | None] = {}
         self.records: dict[str, dict] = {}
+
+    def last_trading_date(self, contract: str) -> str | None:
+        """Return a contract's published final trading date."""
+        if contract not in self.last_trading_dates:
+            try:
+                record = read_contracts(contract=contract, root=self.root).iloc[0]
+            except KeyError:
+                self.last_trading_dates[contract] = None
+            else:
+                value = pd.to_datetime(str(record["最后交易日期"]), format="%Y%m%d")
+                self.last_trading_dates[contract] = str(value.date())
+        return self.last_trading_dates[contract]
 
     def __call__(self, contract: str, timestamp: pd.Timestamp) -> ExactQuote | None:
         day = str(pd.Timestamp(timestamp).date())

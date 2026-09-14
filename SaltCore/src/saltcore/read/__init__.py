@@ -2,6 +2,7 @@
 
 from ._root import SaltDataRootError, data_root
 from .bars import read_bars, scan
+from .contracts import read_contracts
 from .types import COLUMNS, BarScan, BarSet, BarSlice
 
 __all__ = [
@@ -12,5 +13,6 @@ __all__ = [
     "SaltDataRootError",
     "data_root",
     "read_bars",
+    "read_contracts",
     "scan",
 ]

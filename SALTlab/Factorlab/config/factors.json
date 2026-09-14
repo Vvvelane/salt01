@@ -44,19 +44,19 @@
       "holding_scope": "session"
     },
     {
-      "strategy_id": "FRV001_daily_5d_v1",
+      "strategy_id": "FRV001_daily_scale_5d_v3",
       "factor_id": "FRV001",
-      "name": "5交易日滚动收益反转",
-      "implementation": "daily_reversal",
-      "frequency": "daily",
+      "name": "5交易日尺度分钟扫描反转",
+      "implementation": "daily_scale_displacement",
+      "frequency": "1min",
       "signal_sign": -1,
-      "lookback_bars": 5,
-      "volatility_lookback": 120,
-      "entry_threshold": 2.75,
+      "lookback_days": 5,
+      "volatility_lookback_days": 120,
+      "entry_threshold": 2.0,
       "exit_threshold": 0.0,
-      "derived_holding_bars": "lookback_bars",
+      "derived_holding_trading_days": "lookback_days",
       "holding_scope": "research_period",
-      "roll_day_policy": "exclude_and_reset_signal"
+      "roll_day_policy": "require_same_contract_as_lookback_anchor"
     },
     {
       "strategy_id": "FID004_day_v3",

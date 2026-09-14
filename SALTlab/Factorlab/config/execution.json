@@ -1,21 +1,25 @@
 {
   "version": "factorlab-v3",
   "fill_model": "signal_close_next_bar_open",
-  "slippage_ticks": 0,
+  "execution_delay_bars": 0,
   "quantity": 1,
   "allow_pyramiding": false,
   "allow_same_bar_reversal": false,
   "entry_cutoff_minutes_before_scope_end": 5,
   "force_flat_minutes_before_scope_end": 5,
   "reject_invalid_or_zero_volume_bar": true,
-  "flat_ohlc_day_policy": "exclude_trading_date",
+  "flat_ohlc_minute_policy": "exclude_minute",
+  "flat_ohlc_daily_policy": "exclude_completed_daily_bar_from_daily_features",
   "session_rules_mode": "current_rules_scenario",
   "notes": [
-    "信号在已完成的bar收盘计算，只在下一根bar开盘尝试成交。",
+    "信号在已完成的bar收盘计算；固定于下一根bar开盘尝试成交，execution_delay_bars 在此基础上再等待若干根bar，=0 时就是原来的下一根开盘。",
+    "delay 是 fill-or-kill：只在恰好第 execution_delay_bars+1 根 bar 尝试一次，等待期间和目标 bar 本身不可成交则整笔作废，不排队重试。",
     "当前每个品种独立按一手运行，累计PnL从0开始；没有组合仓位与账户级风险控制。",
     "scope收盘前5分钟进入平仓窗口：首个可交易open强平，窗口内禁止新开仓。",
-    "0滑点是当前明确的理想情景；手续费仍按品种分别扣除。",
-    "salt-data已有日度涨跌停表但本版尚未接入；任一有效平OHLC bar会使整个trading date退出信号构造和成交。",
-    "少量缺失或无效1min只跳过该观测，不排除整个session；观测窗口可以略长于墙钟时间。"
+    "滑点改为按品种从 config/instruments.json 的 slippage_ticks * tick_size 读取，不再是这里的全局常数；具体数值与来源见该文件每个品种的 slippage_source。",
+    "滑点方向：入场按不利方向偏移（多头买贵、空头卖便宜），出场同理（平多卖便宜、平空买贵），即 price = reference ± slippage_ticks * tick_size。",
+    "salt-data已有日度涨跌停表但本版尚未接入；平OHLC分钟只使该分钟不可用于信号或成交，已完成的平OHLC日线不进入日尺度特征。",
+    "少量缺失或无效1min只跳过该观测，不排除整个session；观测窗口可以略长于墙钟时间。",
+    "各因子经济信号用到的价格并不统一：FRV001/FCM001只用close；FTR001额外用当日第一根open做锚点；FID004的开盘区间机制本身依赖high/low。成交本身用open，止损用high/low判断触发，但没有复现bar内open/high/low/close的真实先后路径，止损只是各自独立判断\"开盘即穿\"或\"区间内触及\"两种情况；见 issues/close-only-signal-no-intrabar-path.md。"
   ]
 }

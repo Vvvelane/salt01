@@ -56,6 +56,14 @@ def product_id(path: Path) -> str:
     return f"{exchange}.{code}"
 
 
+def contract_info_file(product: str, root: str | Path | None = None) -> Path:
+    """Return the product's published contract-information CSV."""
+    path = product_path(product, root).parent / "x.合约信息.csv"
+    if not path.is_file():
+        raise FileNotFoundError(f"找不到合约信息：{product}")
+    return path
+
+
 def series_files(
     product: str,
     *,

@@ -150,7 +150,9 @@ class TradingCalendar:
         )
         bars["flat_ohlc"] = bars["bar_valid"] & ohlc.nunique(axis=1).eq(1)
         bars["flat_ohlc_day"] = bars["flat_ohlc"].groupby(bars["trading_date"], sort=False).transform("any")
-        bars["valid"] = bars["bar_valid"] & ~bars["flat_ohlc_day"]
+        # A flat minute invalidates that minute only. Daily-scale factors decide
+        # separately whether a completed daily OHLC bar is flat.
+        bars["valid"] = bars["bar_valid"] & ~bars["flat_ohlc"]
         bars["tradable"] = bars["valid"]
         bars["roll_flag"] = bars["contract"].ne(bars["contract"].shift()).fillna(False)
         return bars.set_index("ts", drop=False), outside

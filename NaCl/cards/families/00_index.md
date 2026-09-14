@@ -44,6 +44,36 @@
   - SEA-B1 年内季节：FSE001（方向性·单标的）
   - SEA-B2 月内与周内节奏：FSE002（方向性·单标的）、FSE003（方向性·单标的）、FSE004（方向性·单标的）
 
+## 四段式卡片框架
+
+试行范围：FTR001、FRV001、FID004、FCM001（已在 Factorlab 实践）。其余 54 张卡暂保持原样，四段待处理。
+
+1. **只写经济层**（[factor_architecture.md](../factor_architecture.md) §3）：规则的形式与符号，不写数值。数值只在 `SALTlab/Factorlab/config/factors.json`，可调，是后续学习与修改的对象。
+2. **四段**：
+   - **构造**：$X_t$ 的公式、可用时点、有效性条件；同一 idea 的实现变体在这里区分。
+   - **入场**：空仓时 $X_t$ 满足什么形式开仓。
+   - **持仓更新**：持仓期间经济状态怎么变化；没有就写"无"。
+   - **出场**：$X_t$ 与持仓满足什么形式平仓。
+3. **层归属按 §6.3 判据**：
+   - 只依赖 $X_t$ 与上一期持仓 → 经济层，写进四段。
+   - 依赖入场时点、入场价、持仓期极值、交易史或账户 → 仓位层。
+   - 依赖交易所合约规则或时钟 → 制度层。
+   - 研究时选定的持仓范围（session / 交易日 / 研究期）→ 研究边界。它不是交易所规则，同一 idea 的不同变体可以不同。
+   - 后三类不写进四段；卡末"本卡不定义"只列这张卡特有的规则。
+4. **判据判不了的**写 ⚠ 并说明理由（§6.4），不强行归类。
+5. 原 Tab A / Tab B 移入卡末附录，暂不删除。重新生成 JSON 时以四段为唯一来源；附录中的失效风险、关系等是否保留，由重生成时决定。
+
+### 所有卡共享、不在卡内重复的非经济规则
+
+| 规则 | 层 | Factorlab 位置 |
+| --- | --- | --- |
+| bar 收盘后出信号，下一根 open 尝试成交，另可再等待若干根 bar | 执行 | `config/execution.json`（`execution_delay_bars`）、`infra/backtest.py` |
+| 滑点、手续费 | 执行 | `config/instruments.json` |
+| 不加仓；同一事件不反手 | 仓位层 | `infra/backtest.py` |
+| 持仓范围收盘前若干分钟强平并禁止开仓 | 研究边界 | `config/factors.json` 的 `holding_scope` + `config/execution.json` 的 `force_flat_minutes_before_scope_end` |
+| 主连换月、合约最后交易日强制退出 | 制度层 | `infra/backtest.py`、`fcm001/dev/factor.py` |
+| 平 OHLC 或无效 bar 不出信号、不成交 | 数据有效性 | `config/execution.json` |
+
 ## 旧研究组对照
 
 | 旧家族 | 新位置 |

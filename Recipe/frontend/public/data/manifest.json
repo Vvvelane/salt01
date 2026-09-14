@@ -1,0 +1,1 @@
+{"commit": "b672f10", "generated_at": "2026-09-14T09:07:37+00:00", "strategies": ["FTR001_rolling_30m_v3", "FTR001_trading_day_v3", "FRV001_rolling_5m_v3", "FRV001_daily_scale_5d_v3", "FID004_day_v3", "FID004_night_v3", "FCM001_daily_v1"]}

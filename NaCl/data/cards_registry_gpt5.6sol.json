@@ -1055,7 +1055,7 @@
       "observable_data": "`Close price`",
       "temporal_structure": "`NA`",
       "competes_with": [
-        "FTR"
+        "TRD"
       ],
       "composed_with": [],
       "economic_failure_modes": "- 极端价格变化可能来自永久性新信息而非临时压力，此时反转假设会失效并可能转为趋势延续。 **（待验证）**\n- 均值或锚点本身可能持续移动，因此“回到均值”不等于经济价值已经恢复。 **（待验证）**",
@@ -1202,7 +1202,7 @@
       "observable_data": "`Close price`, `Open Interest`",
       "temporal_structure": "`NA`",
       "competes_with": [
-        "FTR"
+        "TRD"
       ],
       "composed_with": [
         "FRV001",
@@ -1684,7 +1684,7 @@
       "temporal_structure": "`Cross-Sectional Re-ranking。`",
       "competes_with": [],
       "composed_with": [
-        "FVR"
+        "VOL"
       ],
       "economic_failure_modes": "- 截面排序可能只是其他已知因子或板块暴露的代理，增量经济信息可能很弱。 **（待验证）**\n- 排序变量与仓位缩放若使用同一风险信息，可能产生 double counting。 **（待验证）**\n- 所谓低波动溢价可能来自其他暴露或杠杆约束，而非独立 alpha。 **（待验证）**",
       "source": {

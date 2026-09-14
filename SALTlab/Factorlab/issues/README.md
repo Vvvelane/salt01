@@ -315,6 +315,12 @@ Factorlab 直接使用 salt-data 已发布主连及其中的 contract 代码变�
 本节对应旧平-OHLC 成交政策。173 笔延迟退出已经单独冻结；当前 FTR001/FID004 的落盘文件仍来自
 这次运行，FRV001 已被下一节的新运行替换。
 
+## 10.5 主连不复权（已知限制，暂不修复）
+
+已核实 RB2505→RB2510 换月时主连价格跳约 2.4%，是合约价差不是持仓收益。FCM001 的 60 日动量与
+120 日波动率已跳过换月日的收益观测作为局部规避；完整复权修复不在本轮范围内，详见
+[main-series-not-back-adjusted](main-series-not-back-adjusted.md)。
+
 ## 10. 2026-09-13 FRV001 日内与日频重跑
 
 - 按当前整交易日平-OHLC排除政策重新运行 `FRV001`，得到 2 个注册 × research11 的 22 组结果。
@@ -330,3 +336,39 @@ Factorlab 直接使用 salt-data 已发布主连及其中的 contract 代码变�
   RB 45、RU 299、M 165、P 560、JM 739、CF 898、SR 295。平 OHLC 可能只是普通低波动分钟，
   所以这些结果只能用来验收链路，不能据此判断策略经济价值。接入真实涨跌停表后必须重新生成。
 - 13 条 Factorlab 反例测试、Ruff、uv lock 与 Recipe TypeScript/Vite build 均通过。
+
+## 11. 2026-09-13 接入真实滑点，新增可配置 execution_delay_bars
+
+此前 `config/execution.json` 的 `slippage_ticks: 0` 只是声明，`infra/backtest.py` 从未读取它去
+调整成交价；`fill_model` 描述的"下一根bar开盘成交"也完全写死在状态机里，不是配置。这一轮把两者
+都改成真正生效的参数：
+
+- **滑点改为按品种**，从 `config/instruments.json` 每个产品的 `slippage_ticks * tick_size` 读取，
+  公式为 `price = reference ± slippage_ticks * tick_size`：入场按不利方向偏移（多头买贵、空头卖
+  便宜），出场同理（平多卖便宜、平空买贵）；`close_position` 内部统一处理，止损的跳空价和触发价
+  也走同一套逻辑。FCM001 的归一化收益记账里，滑点换算成 `slippage_ticks*tick_size/price` 的分数
+  成本，和手续费一起计入 `cost_return`，不改动逐日 mark-to-market 用的价格路径。
+- 11 个品种里 9 个（CFFEX.IC、SHFE.AG/RB/RU、DCE.M/P/JM、CZCE.CF/SR）的滑点直接取自
+  `派生数据/文档/副本手续费&滑点 2410222 .et`——和这几个品种的手续费字段引用的是同一行，包括
+  SHFE.RB 那行原表代码错标成"RM"、按品名订正为RB的既有先例。SHFE.AU、SHFE.CU 该表没有对应行，
+  借用同交易所、同属高流动性金属的白银(AG)真实滑点 2.4 做近似，在 `slippage_source` 里明确标注
+  为借用而非实测。
+- **新增 `execution_delay_bars`**（默认 0）：在原有"下一根bar开盘"之上再等待若干根bar才尝试成交，
+  仍是 fill-or-kill——只在恰好第 `delay_bars+1` 根bar 尝试一次，等待期间任何一根不可成交都不会
+  重试或提前成交，目标bar本身不可成交则整笔作废。`delay_bars=0` 精确复现原有行为（已有 20 个既有
+  反例测试全部原样通过）；新增 2 条反例测试验证滑点方向和 delay 的位移都正确。
+- 因为滑点从 0 变成非 0，全部 55 组单品种结果 + FCM001 已重新生成（`uv run factorlab run-all`，
+  12 分钟）。验收：11 个品种 `coverage_complete` 全部 true；55 组逐日 PnL 与完整交易 PnL 残差均为
+  0（不是近似小于 1e-6，是精确相等）；全部期末仓位为 0；23 条 Factorlab 反例测试、Ruff、Recipe
+  TypeScript/Vite build 均通过。55 组合计净 PnL 从滑点前的正数区间变为 `-15,573,604.11`（这是把
+  11 个品种各自一手账户直接相加的金额，不是等风险组合收益率，参见 §6.4 的既有说明）；FCM001 的
+  十年复合收益从滑点前的 306.1% 降到 251.5%，方向和量级都符合"日频 846 次调仓、多数品种滑点在
+  0.5–2.5 tick 之间"的预期。
+- Recipe 的 `/api/factor-results` 原来从 `metadata.json` 读一个全局 `slippage_ticks_per_fill`；
+  这个字段已经不存在，改成按当前选中的品种查 `instruments.json`：所有选中品种滑点一致才返回该
+  数值，选了滑点不同的多个品种时返回 `null`（不编造一个混合平均数）。
+- 另外把"经济信号/成交/止损分别用到哪些 OHLC 字段、有没有真实复现 bar 内路径"写成了单独的
+  [close-only-signal-no-intrabar-path](close-only-signal-no-intrabar-path.md)：结论是并非统一
+  只用 close（FRV001/FCM001 只用 close，FTR001 额外用当日 open 锚定，FID004 的开盘区间机制本身
+  依赖 high/low），但四个因子都没有真实的 bar 内分笔路径重建，止损的"跳空"和"区间内触及"是两个
+  独立判断，不是逐笔穿越模拟。

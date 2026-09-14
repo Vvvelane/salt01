@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 from fid004.dev.factor import opening_range
-from frv001.dev.factor import daily_reversal, load_daily_product
+from frv001.dev.factor import daily_scale_displacement, load_daily_history
 from ftr001.dev.factor import trading_day_anchor
 
 from infra.backtest import simulate
@@ -46,7 +46,11 @@ def _feature(data: ProductData, strategy: dict, requested_start: str, instrument
 def _merge_summary(path: Path, fresh: pd.DataFrame) -> None:
     if path.exists():
         previous = pd.read_csv(path)
-        previous = previous[previous["product_id"].isin(product_ids())]
+        active_strategy_ids = {item["strategy_id"] for item in catalog()}
+        previous = previous[
+            previous["product_id"].isin(product_ids())
+            & previous["strategy_id"].isin(active_strategy_ids)
+        ]
         keys = set(zip(fresh["strategy_id"], fresh["product_id"], strict=True))
         keep = [
             (strategy_id, product_id) not in keys
@@ -86,8 +90,7 @@ def run(
     for product in products:
         data = load_product(product, instrument_map[product], warmup_start, end_exclusive, root)
         minute_exact_quotes = ExactContractQuotes(root)
-        daily_exact_quotes = ExactContractQuotes(root, freq="daily")
-        daily_data = None
+        daily_history = None
         data_records[product] = {
             "source_read_start": str(data.read_start),
             "source_first": str(data.source_first),
@@ -96,33 +99,37 @@ def run(
             "outside_current_session_rows": data.outside_session_rows,
             "current_rule_boundary_gap_sessions": data.boundary_gap_sessions,
             "current_rule_boundary_gap_trading_days": data.boundary_gap_trading_days,
-            "flat_ohlc_excluded_trading_days": data.flat_ohlc_days,
+            "flat_minute_trading_days": data.flat_ohlc_days,
             "source_sha256": data.digest,
             "coverage_complete": data.source_first.normalize() <= pd.Timestamp(warmup_start).normalize() and data.source_last.normalize() >= (pd.Timestamp(end_exclusive) - pd.Timedelta(days=1)).normalize(),
         }
         for strategy in selected:
-            if strategy["frequency"] == "daily":
-                if daily_data is None:
-                    daily_data = load_daily_product(
+            if strategy["implementation"] == "daily_scale_displacement":
+                if daily_history is None:
+                    daily_history = load_daily_history(
                         product,
-                        instrument_map[product],
                         data,
                         warmup_start,
                         end_exclusive,
                         root,
                     )
                     data_records[product]["daily_source"] = {
-                        "source_first": str(daily_data.source_first),
-                        "source_last": str(daily_data.source_last),
-                        "source_rows": daily_data.source_rows,
-                        "source_sha256": daily_data.digest,
+                        "source_first": str(daily_history.source_first),
+                        "source_last": str(daily_history.source_last),
+                        "source_rows": daily_history.source_rows,
+                        "source_sha256": daily_history.digest,
                     }
-                study_bars = daily_data.bars
-                signal, measurement = daily_reversal(study_bars, strategy), {}
-                exact_quotes = daily_exact_quotes
+                study_bars = data.bars
+                signal = daily_scale_displacement(
+                    study_bars, daily_history.bars, strategy
+                )
+                measurement = {}
+                exact_quotes = minute_exact_quotes
                 coverage_complete = (
-                    daily_data.source_first.normalize() <= pd.Timestamp(warmup_start).normalize()
-                    and daily_data.source_last.normalize()
+                    data_records[product]["coverage_complete"]
+                    and daily_history.source_first.normalize()
+                    <= pd.Timestamp(warmup_start).normalize()
+                    and daily_history.source_last.normalize()
                     >= (pd.Timestamp(end_exclusive) - pd.Timedelta(days=1)).normalize()
                 )
             else:
@@ -173,7 +180,6 @@ def run(
             print(f"{strategy['strategy_id']} {product}: {summary['trades']} trades, net={summary['net_pnl']:.2f}", flush=True)
         data_records[product]["exact_contract_quotes"] = {
             "1min": minute_exact_quotes.records,
-            "daily": daily_exact_quotes.records,
         }
 
     summary_frame = pd.DataFrame(summaries)
@@ -182,7 +188,7 @@ def run(
         summary_path = outputs[factor] / "summary.csv"
         _merge_summary(summary_path, factor_rows)
         available_rows = pd.read_csv(summary_path)
-        factor_catalog = [item for item in selected if item["factor_id"] == factor]
+        factor_catalog = factor_strategies(factor)
         metadata_path = outputs[factor] / "metadata.json"
         previous_metadata = json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.exists() else {}
         previous_data = {
@@ -217,7 +223,7 @@ def run(
             "limitations": [
                 "Current session schedules and current reference costs are applied over history.",
                 "Main continuous data is consumed as published; Factorlab does not rebuild or independently verify its adjustment.",
-                "Daily price-limit tables exist in salt-data but are not connected yet; any trading day containing a valid flat-OHLC bar is excluded from signals and fills.",
+                "Daily price-limit tables exist in salt-data but are not connected yet; a flat 1min bar invalidates only that minute, while a completed flat daily bar is excluded from daily-scale features.",
                 "Missing individual minute rows, including configured session boundaries, are recorded but do not exclude the whole session.",
             ],
         }
@@ -233,7 +239,13 @@ def run_factor(factor_id: str, products: list[str] | None = None, **kwargs) -> p
         strategy = selected[0]
         if products is not None and set(products) != set(strategy["products"]):
             raise ValueError("FCM001 requires its complete fixed commodity universe")
-        return run_study(strategy=strategy, **kwargs).summary
+        parameters = {
+            "start": DEFAULT_START,
+            "end_exclusive": DEFAULT_END,
+            "warmup_start": DEFAULT_WARMUP,
+            **kwargs,
+        }
+        return run_study(strategy=strategy, **parameters).summary
     return run(factor_strategies(factor_id), products, **kwargs)
 
 
