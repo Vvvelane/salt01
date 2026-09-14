@@ -1,0 +1,8 @@
+{
+  "name": "saltlab-recipe",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "Recipe/static/dist",
+    "not_found_handling": "single-page-application"
+  }
+}
